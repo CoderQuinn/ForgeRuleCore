@@ -1,6 +1,6 @@
 //
 //  CountryLookup.swift
-//  ForgeFlowClassifier
+//  ForgeRuleCore
 //
 //  Created by MagicianQuinn on 2026/2/11.
 //
@@ -9,7 +9,5 @@ import ForgeBase
 import Foundation
 
 public protocol CountryLookup: Sendable {
-    ///
-    /// - "cn", "us", "telegram"
-    func lookupKey(ip: FBIPv4) -> String?
+    func lookupCountryCode(ip: FBIPv4) -> CountryCode?
 }

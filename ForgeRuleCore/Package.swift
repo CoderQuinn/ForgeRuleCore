@@ -4,27 +4,24 @@
 import PackageDescription
 
 let package = Package(
-    name: "ForgeFlowClassifier",
+    name: "ForgeRuleCore",
     platforms: [
         .iOS(.v15),
         .macOS(.v13),
     ],
     products: [
-        // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
-            name: "ForgeFlowClassifier",
-            targets: ["ForgeFlowClassifier"]
+            name: "ForgeRuleCore",
+            targets: ["ForgeRuleCore"]
         ),
     ],
     dependencies: [
         .package(url: "https://github.com/CoderQuinn/ForgeBase.git", from: "0.2.1"),
     ],
     targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
-        // Targets can depend on other targets in this package and products from dependencies.
         .target(
             name: "libmaxminddb",
-            path: "Sources/ForgeFlowClassifier/GeoMMDB/libmaxminddb",
+            path: "Sources/ForgeRuleCore/GeoMMDB/libmaxminddb",
             sources: [
                 "src/data-pool.c",
                 "src/maxminddb.c",
@@ -39,11 +36,11 @@ let package = Package(
         .target(
             name: "GeoMMDBBridge",
             dependencies: ["libmaxminddb"],
-            path: "Sources/ForgeFlowClassifier/GeoMMDB/GeoMMDBBridge",
+            path: "Sources/ForgeRuleCore/GeoMMDB/GeoMMDBBridge",
             publicHeadersPath: "include"
         ),
         .target(
-            name: "ForgeFlowClassifier",
+            name: "ForgeRuleCore",
             dependencies: ["GeoMMDBBridge", "ForgeBase"],
             exclude: [
                 "GeoMMDB/GeoMMDBBridge",
@@ -51,8 +48,8 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "ForgeFlowClassifierTests",
-            dependencies: ["ForgeFlowClassifier"]
+            name: "ForgeRuleCoreTests",
+            dependencies: ["ForgeRuleCore"]
         ),
     ]
 )

@@ -1,6 +1,6 @@
 //
 //  DomainExactSet.swift
-//  ForgeFlowClassifier
+//  ForgeRuleCore
 //
 //  Created by MagicianQuinn on 2026/2/11.
 //

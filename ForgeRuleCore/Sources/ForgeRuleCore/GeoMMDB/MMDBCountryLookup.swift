@@ -1,6 +1,6 @@
 //
 //  MMDBCountryLookup.swift
-//  ForgeFlowClassifier
+//  ForgeRuleCore
 //
 //  Created by MagicianQuinn on 2026/2/11.
 //
@@ -15,7 +15,7 @@ public final class MMDBCountryLookup: CountryLookup {
         reader = try MMDBReader(url: url)
     }
 
-    public func lookupKey(ip: FBIPv4) -> String? {
-        reader.countryCode(of: ip)?.string.lowercased()
+    public func lookupCountryCode(ip: ForgeBase.FBIPv4) -> CountryCode? {
+        reader.countryCode(of: ip)
     }
 }

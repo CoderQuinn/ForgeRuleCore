@@ -1,6 +1,6 @@
 //
 //  GeoSiteModels.swift
-//  ForgeFlowClassifier
+//  ForgeRuleCore
 //
 //  Created by MagicianQuinn on 2026/2/11.
 //
@@ -12,8 +12,13 @@ public struct GeoSiteListJSON: Codable, Sendable {
 }
 
 public struct GeoSiteJSON: Codable, Sendable {
-    public let country_code: String
+    public let name: String
     public let domains: [DomainJSON]
+
+    private enum CodingKeys: String, CodingKey {
+        case name = "country_code"
+        case domains
+    }
 }
 
 public struct DomainJSON: Codable, Sendable {

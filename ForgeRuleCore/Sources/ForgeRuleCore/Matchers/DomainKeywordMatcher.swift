@@ -1,6 +1,6 @@
 //
 //  DomainKeywordMatcher.swift
-//  ForgeFlowClassifier
+//  ForgeRuleCore
 //
 //  Created by MagicianQuinn on 2026/2/11.
 //
@@ -18,7 +18,6 @@ public struct DomainKeywordMatcher: Sendable {
 
     @inline(__always)
     public func containsKeyword(in domain: String) -> Bool {
-        if domain.count < 4 { return false }
         for key in keywords {
             if domain.contains(key) {
                 return true

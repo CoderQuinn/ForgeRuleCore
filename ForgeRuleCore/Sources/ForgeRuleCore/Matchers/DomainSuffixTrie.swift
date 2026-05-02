@@ -1,6 +1,6 @@
 //
 //  DomainSuffixTrie.swift
-//  ForgeFlowClassifier
+//  ForgeRuleCore
 //
 //  Created by MagicianQuinn on 2026/2/11.
 //
@@ -9,7 +9,7 @@ import Foundation
 
 public struct DomainSuffixTrie: Sendable {
     private struct Node: Sendable {
-        var children: [Substring: Int] = [:]
+        var children: [String: Int] = [:]
         var isEnd: Bool = false // suffix
     }
 
@@ -38,7 +38,8 @@ public struct DomainSuffixTrie: Sendable {
         }
 
         var cur = 0
-        for label in labels.reversed() {
+        for labelSub in labels.reversed() {
+            let label = String(labelSub)
             if let next = nodes[cur].children[label] {
                 cur = next
             } else {
@@ -57,16 +58,12 @@ public struct DomainSuffixTrie: Sendable {
         guard !labels.isEmpty else { return false }
 
         var cur = 0
-        for (i, label) in labels.reversed().enumerated() {
-            guard let next = nodes[cur].children[label] else {
-                return false
-            }
+        for labelSub in labels.reversed() {
+            let label = String(labelSub)
+            guard let next = nodes[cur].children[label] else { return false }
             cur = next
-            if nodes[cur].isEnd && i == labels.count - 1 {
-                return true
-            }
+            if nodes[cur].isEnd { return true }
         }
-
-        return nodes[cur].isEnd
+        return false
     }
 }

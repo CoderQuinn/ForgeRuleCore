@@ -1,6 +1,6 @@
 //
 //  GeoSiteDB.swift
-//  ForgeFlowClassifier
+//  ForgeRuleCore
 //
 //  Created by MagicianQuinn on 2026/2/11.
 //
@@ -24,7 +24,7 @@ public final class GeoSiteDB: Sendable {
         map.reserveCapacity(decoded.geosites.count)
 
         for s in decoded.geosites {
-            let key = normalizeDomain(s.country_code)
+            let key = normalizeDomain(s.name)
 
             var full: [String] = []
             var suffix: [String] = []
