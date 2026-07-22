@@ -314,6 +314,7 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 
 ## 11. 链接
 
+- [TESTING.md](./TESTING.md) — 单元测试治理与 CI 策略
 - [技术文案.md](./技术文案.md) — 代码审查发现与评级（过程文档）
 - [CONTRACT-TESTS.md](./CONTRACT-TESTS.md) — 契约测试与回归计划
 - [QuantumLink 技术升级.md](../../../QuantumLink/docs/技术升级.md) — 跨仓 Review 与升级总控
