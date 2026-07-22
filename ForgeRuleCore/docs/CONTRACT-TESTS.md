@@ -137,11 +137,18 @@
 ## 4. 运行方式
 
 ```bash
+# Repo root (canonical / CI)
+./Scripts/check-test-governance.sh
+./Scripts/run-tests.sh
+
+# Package directory
 cd ForgeRuleCore
 swift test
 ```
 
-验收：全部 `@Test` 通过（含本 PR 新增契约用例）。
+治理策略与 PR checklist 见 [TESTING.md](./TESTING.md)。
+
+验收：全部 `@Test` 通过（含本 PR 新增契约用例），且 governance gate 绿。
 
 ---
 

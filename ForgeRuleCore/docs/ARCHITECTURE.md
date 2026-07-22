@@ -227,6 +227,7 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 - Domain matchers、GeoSite temp JSON、GeoIP stub
 - `RuleEngine` 顺序、`.any` fallback、域名规范化
 - **契约回归**（`ContractRegressionTests`）：见 [CONTRACT-TESTS.md](./CONTRACT-TESTS.md)
+- **治理**：见 [TESTING.md](./TESTING.md)；CI 跑 `Scripts/check-test-governance.sh` + `swift test`
 
 **新增语义规则**：先补 fixture 或 table-driven / 契约测试，再改 matcher / compiler。
 

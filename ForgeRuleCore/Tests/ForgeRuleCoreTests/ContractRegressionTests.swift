@@ -5,6 +5,8 @@ import Testing
 
 // MARK: - Stubs / helpers
 // Contract IDs: see docs/CONTRACT-TESTS.md
+// C-GEOIP-MISS C-GEOIP-RESOLVED C-ANY-ORDER C-DEFAULT-DIRECT C-EVAL-NORMALIZE
+// C-PORT-PROTO-IGNORED C-COMPILER-DROP C-OUTBOUND-MAP C-GEOSITE-REGEX C-FIRST-WINS
 
 private struct StubCountryLookup: CountryLookup {
     let codeByIP: [FBIPv4: CountryCode]
