@@ -37,7 +37,10 @@ let package = Package(
             name: "GeoMMDBBridge",
             dependencies: ["libmaxminddb"],
             path: "Sources/ForgeRuleCore/GeoMMDB/GeoMMDBBridge",
-            publicHeadersPath: "include"
+            publicHeadersPath: "include",
+            cSettings: [
+                .define("MMDB_UINT128_IS_BYTE_ARRAY"),
+            ]
         ),
         .target(
             name: "ForgeRuleCore",
@@ -49,7 +52,10 @@ let package = Package(
         ),
         .testTarget(
             name: "ForgeRuleCoreTests",
-            dependencies: ["ForgeRuleCore"]
+            dependencies: ["ForgeRuleCore"],
+            resources: [
+                .copy("Fixtures"),
+            ]
         ),
     ]
 )

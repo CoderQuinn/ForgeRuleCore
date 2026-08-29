@@ -8,77 +8,73 @@
 #include "GeoMMDBBridge.h"
 #include <maxminddb.h>
 #include <arpa/inet.h>
-#include <string.h>
-#include <stdatomic.h>
+#include <stdlib.h>
 
-static MMDB_s g_db;
-static atomic_int g_refcount = 0;
+typedef struct {
+    MMDB_s database;
+} forge_mmdb_handle;
 
-int forge_mmdb_open(const char *path)
+forge_mmdb_handle_t forge_mmdb_open(const char *path, int *status)
 {
-    int prev = atomic_fetch_add(&g_refcount, 1);
-    if (prev > 0)
-        return 0;
+    if (status == NULL)
+        return NULL;
 
-    int status = MMDB_open(path, MMDB_MODE_MMAP, &g_db);
-    if (status != MMDB_SUCCESS) {
-        atomic_store(&g_refcount, 0);
-        return status;
+    *status = MMDB_SUCCESS;
+    if (path == NULL) {
+        *status = FORGE_MMDB_STATUS_INVALID_ARGUMENT;
+        return NULL;
     }
 
-    return 0;
+    forge_mmdb_handle *handle = calloc(1, sizeof(*handle));
+    if (handle == NULL) {
+        *status = FORGE_MMDB_STATUS_OUT_OF_MEMORY;
+        return NULL;
+    }
+
+    *status = MMDB_open(path, MMDB_MODE_MMAP, &handle->database);
+    if (*status != MMDB_SUCCESS) {
+        free(handle);
+        return NULL;
+    }
+
+    return handle;
 }
 
-void forge_mmdb_close(void)
+void forge_mmdb_close(forge_mmdb_handle_t opaque_handle)
 {
-    int expected = atomic_load(&g_refcount);
-    int desired;
-    
-    // Loop until we successfully decrement or determine we shouldn't
-    while (expected > 0) {
-        desired = expected - 1;
-        if (atomic_compare_exchange_weak(&g_refcount, &expected, desired)) {
-            // Successfully decremented. If we went from 1 to 0, close the database
-            if (expected == 1) {
-                MMDB_close(&g_db);
-            }
-            return;
-        }
-        // CAS failed, expected now contains the current value, loop will recheck
-    }
+    forge_mmdb_handle *handle = opaque_handle;
+    if (handle == NULL)
+        return;
+
+    MMDB_close(&handle->database);
+    free(handle);
 }
 
-uint16_t forge_mmdb_country_ipv4(uint32_t ipv4_be)
+uint16_t forge_mmdb_country_ipv4(forge_mmdb_handle_t opaque_handle, uint32_t ipv4_be)
 {
-    // Increment refcount to ensure database stays open during lookup
-    int prev = atomic_fetch_add(&g_refcount, 1);
-    if (prev <= 0) {
-        // Database was not open, decrement and return
-        atomic_fetch_sub(&g_refcount, 1);
+    forge_mmdb_handle *handle = opaque_handle;
+    if (handle == NULL)
         return 0;
-    }
 
     struct sockaddr_in sa = {0};
     sa.sin_family = AF_INET;
-    sa.sin_addr.s_addr = ipv4_be;
+    sa.sin_addr.s_addr = htonl(ipv4_be);
 
     int err;
     MMDB_lookup_result_s result =
-        MMDB_lookup_sockaddr(&g_db, (struct sockaddr *)&sa, &err);
+        MMDB_lookup_sockaddr(&handle->database, (struct sockaddr *)&sa, &err);
 
     uint16_t country_code = 0;
     
     if (err == MMDB_SUCCESS && result.found_entry) {
         MMDB_entry_data_s data = {0};
-        if (MMDB_get_value(&result.entry, &data, "country", "iso_code", NULL) == MMDB_SUCCESS &&
+        int value_status = MMDB_get_value(&result.entry, &data, "country", "iso_code", NULL);
+        if (value_status == MMDB_SUCCESS &&
             data.has_data && data.type == MMDB_DATA_TYPE_UTF8_STRING && data.data_size == 2) {
             const unsigned char *s = (const unsigned char *)data.utf8_string;
             country_code = ((uint16_t)s[0] << 8) | s[1];
         }
     }
 
-    // Decrement refcount now that we're done with the database
-    atomic_fetch_sub(&g_refcount, 1);
-    
     return country_code;
 }

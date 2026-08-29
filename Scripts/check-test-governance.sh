@@ -13,6 +13,7 @@ die() { echo "governance FAIL: $*" >&2; exit 1; }
 [[ -f "$TESTS/ContractRegressionTests.swift" ]] || die "missing ContractRegressionTests.swift"
 [[ -f "$TESTS/ForgeRuleCoreTests.swift" ]] || die "missing ForgeRuleCoreTests.swift"
 [[ -f "$TESTS/RuleEngineAndMatchersTests.swift" ]] || die "missing RuleEngineAndMatchersTests.swift"
+[[ -f "$TESTS/MMDBReaderContractTests.swift" ]] || die "missing MMDBReaderContractTests.swift"
 [[ -f "$BASELINE" ]] || die "missing baseline: $BASELINE"
 
 # Forbid XCTest placeholders and mixed frameworks in this package.
@@ -32,13 +33,12 @@ fi
 
 # Contract IDs referenced in CONTRACT-TESTS.md should appear in ContractRegressionTests.
 PLAN="$ROOT/ForgeRuleCore/docs/CONTRACT-TESTS.md"
-CONTRACTS="$TESTS/ContractRegressionTests.swift"
 [[ -f "$PLAN" ]] || die "missing CONTRACT-TESTS.md"
 
 while IFS= read -r id; do
   [[ -z "$id" ]] && continue
-  if ! grep -Fq "$id" "$CONTRACTS"; then
-    echo "governance WARN: contract id $id not mentioned in ContractRegressionTests.swift" >&2
+  if ! grep -Fq "$id" "$TESTS"/*.swift; then
+    echo "governance WARN: contract id $id not mentioned in a test source" >&2
     # Soft warning for comment linkage; harden later if desired.
   fi
 done < <(grep -Eo 'C-[A-Z0-9-]+' "$PLAN" | sort -u)
@@ -47,9 +47,12 @@ done < <(grep -Eo 'C-[A-Z0-9-]+' "$PLAN" | sort -u)
 for name in \
   contract_geoip_negation_hits_on_lookup_miss \
   contract_geoip_uses_resolved_ip_not_original \
-  contract_compiler_reports_every_rejected_row
+  contract_compiler_reports_every_rejected_row \
+  mmdb_reader_reads_official_country_fixture \
+  mmdb_readers_own_independent_database_handles \
+  mmdb_reader_teardown_does_not_invalidate_another_reader
 do
-  grep -Fq "func ${name}" "$CONTRACTS" || die "missing required contract test: $name"
+  grep -Fq "func ${name}" "$TESTS"/*.swift || die "missing required contract test: $name"
 done
 
 echo "governance: OK"

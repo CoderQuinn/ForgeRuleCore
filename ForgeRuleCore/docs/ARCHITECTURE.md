@@ -60,7 +60,7 @@ ForgeRuleCoreBundle.makeRuleCore / makeFlowClassifier
 
 ```
 libmaxminddb (C)
-  └── GeoMMDBBridge          ← 进程级 g_db + refcount（已知约束，见 §6）
+  └── GeoMMDBBridge          ← 每个 MMDBReader 独立 opaque handle
         └── ForgeRuleCore
               ├── Core       Rule, RuleEngine, Flow*, Config, Bundle
               ├── Geo        GeoSiteDB, GeoIPDB
@@ -74,7 +74,7 @@ libmaxminddb (C)
 | Flow Adapter | FakeIP / domain 事实解析 | 边界清楚，可注入 |
 | Config Compiler | JSON field → `[Rule]` | narrow 可用；拒绝项有显式 diagnostics |
 | GeoSite | 按站点建 full/suffix/keyword 索引 | 子集；`regex` / attributes 忽略 |
-| GeoMMDB | IPv4 → 国家码 | **风险高**：全局单例 |
+| GeoMMDB | IPv4 → 国家码 | per-reader 不可变 handle；真实 fixture 覆盖 |
 
 ---
 
@@ -195,15 +195,17 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 
 ## 5. 已知约束与风险
 
-### 5.1 MMDB：进程内单活跃库（硬约束）
+### 5.1 MMDB：per-reader ownership 与 snapshot reload
 
-`GeoMMDBBridge` 使用进程级 `g_db` + `g_refcount`：
+`GeoMMDBBridge` 不再持有进程级数据库或 refcount：
 
-- 已有打开实例时，再次 `open(不同路径)` **不会切换**数据库。
-- `MMDBReader.reopen()` 可能影响其它逻辑上的 reader。
-- 查找路径与 Swift `DispatchQueue` 串行保护叠加，语义难推理。
+- 每次 `forge_mmdb_open` 返回独立 opaque handle；打开失败不会借用其它 reader 的数据库。
+- 每个 `MMDBReader` 拥有并在 `deinit` 时只关闭自己的 handle；不同路径可同时存在。
+- lookup 在 reader 自己的串行队列执行，teardown 不会使其它 reader 失效。
+- Swift/C 两个 target 使用相同的 `MMDB_UINT128_IS_BYTE_ARRAY` 定义，避免 `MMDB_entry_data_s` ABI 布局错读。
+- `FBIPv4.beValue` 在 C `sockaddr_in` 边界经 `htonl` 转换，真实 IPv4 fixture 锁定字节序。
 
-**当前集成约束**：进程（或 Network Extension）内 **只应存在一个活跃 MMDB 路径**；不要并行打开多个 `MMDBReader` 指向不同文件。真正的热更新应通过 **整份 `RuleEngine` / `GeoIPDB` snapshot 替换** 实现，而不是依赖 `reopen()`。
+`MMDBReader` 不提供原地 `reopen()`。热更新必须先构建新的完整 `RuleEngine` / `GeoIPDB` snapshot，验证成功后由上层原子替换；旧 snapshot 可继续服务在途读取，直至其 reader 自然析构。
 
 ### 5.2 Compiler 兼容投影
 
@@ -246,7 +248,7 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 
 **已知缺口**：
 
-- 小型真实 `geoip.mmdb` fixture
+- 大型生产 `geoip.mmdb` fixture 与更多国家/边界样例（小型官方 fixture 已覆盖 reader contract）
 - compiler rejected reason / source row index
 - 并发 classify / snapshot swap
 - Bundle 文件缺失细分错误
@@ -260,7 +262,7 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 | Phase 2 | Extension 链接 ForgeRuleCore SPM | 规划 |
 | Phase 2 | App Group 加载 geosite / geoip | Bundle 已有；缺文件诊断 |
 | Phase 2 | NetForge `TrafficPolicyProvider` → `evaluate` | 规划 |
-| Phase 2 | 热更新：snapshot swap + provider message | 规划；**勿依赖 `reopen()`** |
+| Phase 2 | 热更新：snapshot swap + provider message | 规划；reader handle 已支持并存 |
 
 **当前**：QuantumLink 侧主要是 App Group 文件通道；Xcode target 链接仍以规划为准。
 
@@ -273,10 +275,10 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 ### P0 — 正确性与可观测性
 
 - [x] README routing 范围与 narrow compiler 对齐
-- [x] 架构文档写死：`geoip:!cc` miss 行为、MMDB 单活跃库、`port`/`proto` reserved、`.any` 推荐置底
+- [x] 架构文档写死：`geoip:!cc` miss 行为、MMDB per-reader ownership、`port`/`proto` reserved、`.any` 推荐置底
 - [x] `FieldRoutingRuleFactory` diagnostics API（拒绝 row 带稳定 reason 与原始下标；部分结果不报告成功）
-- [ ] MMDB：文档约束落地为 API 保障，或改为 per-instance `MMDB_s*`；收敛 / 隐藏误导性 `reopen()`
-- [x] 回归测试：`geoip:!cc` + lookup miss；（若保留全局 bridge）单路径约束说明测试 — miss 契约见 `ContractRegressionTests` / [CONTRACT-TESTS.md](./CONTRACT-TESTS.md)；MMDB 多路径仍待 API 保障
+- [x] MMDB：per-reader opaque handle；移除误导性 `reopen()`；真实 fixture 锁定 ABI、IPv4 字节序、独立 ownership 与 teardown
+- [x] 回归测试：`geoip:!cc` + lookup miss；MMDB 真实 lookup、不同数据库并存、失败隔离与 teardown
 
 ### P1 — MVP 规则语义与 API 边界
 
@@ -304,7 +306,7 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 ### Next（当前冲刺）
 
 1. Compiler diagnostics（已完成）
-2. MMDB 单实例约束产品化（API 或 per-instance）  
+2. MMDB per-instance ownership（已完成）
 3. `geoip:!` miss 契约测试  
 4. `IP-CIDR` / `IP-CIDR6`  
 5. Composite condition model  
@@ -322,6 +324,7 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 | 2026-04-30 | 文档化；QuantumLink 接入列入 Phase 2 |
 | 2026-06-27 | 明确 narrow compiler 契约与架构 TODO |
 | 2026-07-19 | 吸收代码审查：数据流、stable API、Geo/`!cc`/MMDB 硬约束、TODO 重排 |
+| 2026-08-29 | compiler diagnostics；GeoMMDB per-reader handle 与真实 fixture contract |
 
 ---
 
