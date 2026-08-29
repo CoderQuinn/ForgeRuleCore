@@ -8,8 +8,8 @@
 //  `geosite:` / plain suffix) **or** a single `geoip:`. Additional Surge-style rule types
 //  (`IP-CIDR`, `RULE-SET`, …) are not parsed here yet.
 //
-//  **Rejected (`nil`):** multiple `domain` lines, `domain` + `ip` together, non-empty `network`,
-//  `regexp:` domain entries.
+//  **Rejected with diagnostics:** multiple `domain` lines, `domain` + `ip` together, non-empty
+//  `network`, `regexp:` domain entries.
 //
 
 import ForgeBase
@@ -33,37 +33,103 @@ public struct FieldRuleJSON: Codable, Sendable {
     public var network: String?
 }
 
+// MARK: - Compilation
+
+/// Stable reason codes for field rows that cannot be lowered without changing their meaning.
+public enum FieldRoutingDiagnosticReason: String, Error, Sendable, Equatable {
+    case unsupportedRuleType = "unsupported_rule_type"
+    case missingOutboundTag = "missing_outbound_tag"
+    case unsupportedNetwork = "unsupported_network"
+    case mixedDomainAndIP = "mixed_domain_and_ip"
+    case multipleDomainEntries = "multiple_domain_entries"
+    case multipleIPEntries = "multiple_ip_entries"
+    case missingCondition = "missing_condition"
+    case invalidDomainEntry = "invalid_domain_entry"
+    case unsupportedDomainEntry = "unsupported_domain_entry"
+    case invalidIPEntry = "invalid_ip_entry"
+    case unsupportedIPEntry = "unsupported_ip_entry"
+}
+
+/// A rejected source row and the stable reason why it was not lowered.
+public struct FieldRoutingDiagnostic: Sendable, Equatable {
+    public let fieldIndex: Int
+    public let reason: FieldRoutingDiagnosticReason
+
+    public init(fieldIndex: Int, reason: FieldRoutingDiagnosticReason) {
+        self.fieldIndex = fieldIndex
+        self.reason = reason
+    }
+}
+
+/// Ordered rules plus every rejected source row. Partial rules are never reported as successful.
+public struct FieldRoutingCompilation: Sendable, Equatable {
+    public let rules: [Rule]
+    public let diagnostics: [FieldRoutingDiagnostic]
+
+    public var isSuccessful: Bool { diagnostics.isEmpty }
+}
+
 // MARK: - Factory
 
 public enum FieldRoutingRuleFactory {
-    /// Builds `Rule` list from Xray-style field rules (order preserved).
-    public static func makeRules(from fields: [FieldRuleJSON]) -> [Rule] {
-        fields.compactMap(makeRule)
+    /// Compiles Xray-style field rules while preserving accepted order and rejected row indexes.
+    public static func compile(fields: [FieldRuleJSON]) -> FieldRoutingCompilation {
+        var rules: [Rule] = []
+        var diagnostics: [FieldRoutingDiagnostic] = []
+
+        for (fieldIndex, field) in fields.enumerated() {
+            switch compileRule(from: field) {
+            case let .success(rule):
+                rules.append(rule)
+            case let .failure(reason):
+                diagnostics.append(FieldRoutingDiagnostic(fieldIndex: fieldIndex, reason: reason))
+            }
+        }
+
+        return FieldRoutingCompilation(rules: rules, diagnostics: diagnostics)
     }
 
+    /// Compatibility projection that returns only accepted rules (order preserved).
+    /// New integrations should use `compile(fields:)` and require `isSuccessful`.
+    public static func makeRules(from fields: [FieldRuleJSON]) -> [Rule] {
+        compile(fields: fields).rules
+    }
+
+    /// Compatibility projection for one row. Use `compile(fields:)` to retain rejection reasons.
     public static func makeRule(from field: FieldRuleJSON) -> Rule? {
+        guard case let .success(rule) = compileRule(from: field) else { return nil }
+        return rule
+    }
+
+    private static func compileRule(
+        from field: FieldRuleJSON
+    ) -> Result<Rule, FieldRoutingDiagnosticReason> {
         let type = field.type ?? "field"
-        guard type == "field" else { return nil }
-        guard let action = mapOutboundTag(field.outboundTag) else { return nil }
-
-        if let net = field.network {
-            let protos = parseNetworkList(net)
-            if !protos.isEmpty { return nil }
+        guard type == "field" else { return .failure(.unsupportedRuleType) }
+        guard let action = mapOutboundTag(field.outboundTag) else {
+            return .failure(.missingOutboundTag)
         }
 
-        let domainConds = (field.domain ?? []).compactMap { domainEntryCondition($0) }
-        let ipConds = (field.ip ?? []).compactMap { ipEntryCondition($0) }
-
-        guard domainConds.count <= 1, ipConds.count <= 1 else { return nil }
-        guard domainConds.count + ipConds.count == 1 else { return nil }
-
-        if let c = domainConds.first {
-            return Rule(condition: c, action: action)
+        if let network = field.network?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !network.isEmpty
+        {
+            return .failure(.unsupportedNetwork)
         }
-        if let c = ipConds.first {
-            return Rule(condition: c, action: action)
+
+        let domains = field.domain ?? []
+        let ips = field.ip ?? []
+
+        guard domains.isEmpty || ips.isEmpty else { return .failure(.mixedDomainAndIP) }
+        guard domains.count <= 1 else { return .failure(.multipleDomainEntries) }
+        guard ips.count <= 1 else { return .failure(.multipleIPEntries) }
+
+        if let domain = domains.first {
+            return domainEntryCondition(domain).map { Rule(condition: $0, action: action) }
         }
-        return nil
+        if let ip = ips.first {
+            return ipEntryCondition(ip).map { Rule(condition: $0, action: action) }
+        }
+        return .failure(.missingCondition)
     }
 
     // MARK: - Internals
@@ -78,45 +144,49 @@ public enum FieldRoutingRuleFactory {
     }
 
     /// `geosite:name`, `full:`, `domain:`, `keyword:`, or plain hostname (suffix).
-    private static func domainEntryCondition(_ raw: String) -> RuleCondition? {
+    private static func domainEntryCondition(
+        _ raw: String
+    ) -> Result<RuleCondition, FieldRoutingDiagnosticReason> {
         let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !s.isEmpty else { return nil }
+        guard !s.isEmpty else { return .failure(.invalidDomainEntry) }
         if s.hasPrefix("geosite:") {
             let name = String(s.dropFirst("geosite:".count))
             let n = normalizeDomain(name)
-            return n.isEmpty ? nil : .geosite(n)
+            return n.isEmpty ? .failure(.invalidDomainEntry) : .success(.geosite(n))
         }
         if s.hasPrefix("full:") {
             let v = String(s.dropFirst("full:".count))
             let n = normalizeDomain(v)
-            return n.isEmpty ? nil : .domainFull(n)
+            return n.isEmpty ? .failure(.invalidDomainEntry) : .success(.domainFull(n))
         }
         if s.hasPrefix("domain:") {
             let v = String(s.dropFirst("domain:".count))
             let n = normalizeDomain(v)
-            return n.isEmpty ? nil : .domainSuffix(n)
+            return n.isEmpty ? .failure(.invalidDomainEntry) : .success(.domainSuffix(n))
         }
         if s.hasPrefix("keyword:") {
             let v = String(s.dropFirst("keyword:".count))
             let n = normalizeDomain(v)
-            return n.isEmpty ? nil : .domainKeyword(n)
+            return n.isEmpty ? .failure(.invalidDomainEntry) : .success(.domainKeyword(n))
         }
         if s.hasPrefix("regexp:") {
-            return nil
+            return .failure(.unsupportedDomainEntry)
         }
         let n = normalizeDomain(s)
-        return n.isEmpty ? nil : .domainSuffix(n)
+        return n.isEmpty ? .failure(.invalidDomainEntry) : .success(.domainSuffix(n))
     }
 
-    private static func ipEntryCondition(_ raw: String) -> RuleCondition? {
+    private static func ipEntryCondition(
+        _ raw: String
+    ) -> Result<RuleCondition, FieldRoutingDiagnosticReason> {
         let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !s.isEmpty else { return nil }
+        guard !s.isEmpty else { return .failure(.invalidIPEntry) }
         if s.hasPrefix("geoip:") {
             let k = String(s.dropFirst("geoip:".count))
             let n = normalizeGeoipKey(k)
-            return n.isEmpty ? nil : .geoip(n)
+            return n.isEmpty ? .failure(.invalidIPEntry) : .success(.geoip(n))
         }
-        return nil
+        return .failure(.unsupportedIPEntry)
     }
 
     /// Parses `"tcp,udp"` into raw `TransportProtocol` values (reserved for future `network` support).

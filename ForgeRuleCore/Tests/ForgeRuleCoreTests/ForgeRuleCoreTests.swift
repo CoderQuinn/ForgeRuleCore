@@ -113,7 +113,10 @@ private func ip(_ value: UInt32) -> FBIPv4 {
             network: nil
         ),
     ]
-    let rules = FieldRoutingRuleFactory.makeRules(from: fields)
+    let compilation = FieldRoutingRuleFactory.compile(fields: fields)
+    #expect(compilation.isSuccessful)
+    #expect(compilation.diagnostics.isEmpty)
+    let rules = compilation.rules
     #expect(rules.count == 3)
     #expect(rules[0].action == .reject)
     #expect(rules[0].condition == .domainSuffix("ads.example"))

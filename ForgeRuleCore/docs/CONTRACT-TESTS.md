@@ -27,7 +27,7 @@
 | C-DEFAULT-DIRECT | §4.2 #6 | 空规则集行为变化 |
 | C-EVAL-NORMALIZE | §4.2 #2 | 依赖调用方先 normalize |
 | C-PORT-PROTO-IGNORED | §4.1 reserved | 误以为已支持端口/协议分流 |
-| C-COMPILER-DROP | §4.5 | 静默丢弃行为无回归基线 |
+| C-COMPILER-DIAGNOSTICS | §4.5 | 拒绝原因或源 row 下标丢失，部分规则被误报为成功 |
 | C-OUTBOUND-MAP | §4.5 | tag 映射漂移 |
 | C-GEOSITE-REGEX | §4.3 | 误以为 regex 生效 |
 | C-FIRST-WINS | §4.2 #4 | 多规则命中顺序错误 |
@@ -54,7 +54,7 @@
 - 真实 `geoip.mmdb` / 官方 geosite 大文件
 - `MMDBReader` 多路径全局单例（需进程级隔离，另开）
 - `ForgeRuleCoreBundle` App Group（需 mock FileManager）
-- Compiler diagnostics API（尚未实现；本 PR 只锁定「静默丢弃」现状）
+- Compiler diagnostics API（稳定 reason、源 row 下标、partial output 非 success）
 
 ---
 
@@ -105,16 +105,23 @@
 
 同一域名规则；`port`/`proto` 不同不得改变 action。
 
-### C-COMPILER-DROP（现状基线）
+### C-COMPILER-DIAGNOSTICS
 
-下列 field 行 **不产出** Rule（静默丢弃）：
+下列 field 行 **不产出** Rule，并各自产生包含原始 `fieldIndex` 的稳定 reason：
 
 - 两个 `domain:` entry
 - `domain` + `geoip` 同时存在
-- `network: "tcp"`
+- 任意非空 `network`（包括尚不识别的值）
 - `regexp:…`
 - `type: "other"`
 - 空 / 缺失 `outboundTag`
+
+若输入同时包含 accepted 与 rejected rows：
+
+- accepted `rules` 保持原始相对顺序；
+- diagnostics 保持 rejected row 顺序；
+- `isSuccessful == false`，不得把 partial rules 当成完整配置安装；
+- 原始多 entry row 必须先按结构拒绝，不得先过滤非法 entry 再接受剩余项。
 
 ### C-OUTBOUND-MAP
 

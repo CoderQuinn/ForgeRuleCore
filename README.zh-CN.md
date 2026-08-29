@@ -21,7 +21,7 @@ ForgeRuleCore 是供路由与 DNS 共用的 Swift 规则内核，包含 `RuleCor
 
 ## Xray 风格配置（受限子集）
 
-- **路由：** 解码 `RoutingConfigJSON`，再通过 `FieldRoutingRuleFactory.makeRules(from:)` 生成 `[Rule]`。当前编译器每个 `field` 行只接受一个 primitive：单条 `domain`（`geosite:` / `full:` / `domain:` / `keyword:` / 普通后缀）或单条 `ip`（`geoip:` / `geoip:!cn`）。多条 domain、domain+ip 组合、已识别的 `network`、`regexp:` 与 `IP-CIDR` 尚不支持。
+- **路由：** 解码 `RoutingConfigJSON`，再调用 `FieldRoutingRuleFactory.compile(fields:)`。结果包含保序的已接受规则，以及每个被拒绝 row 的原始下标和稳定 reason；安装规则前必须确认 `isSuccessful`。`makeRule(from:)` 与 `makeRules(from:)` 作为兼容投影保留，但不返回 diagnostics。当前 narrow compiler 每个 `field` 行只接受一个 primitive：单条 `domain`（`geosite:` / `full:` / `domain:` / `keyword:` / 普通后缀）或单条 `ip`（`geoip:` / `geoip:!cn`）。多条 domain、domain+ip 组合、任意非空 `network`、`regexp:` 与 `IP-CIDR` 尚不支持。
 - **DNS：** 通过 `DNSRoutingConfigJSON` 解码 `hosts` 与字符串/对象混合的 `servers`。DoH、`expectIPs` 校验和 `skipFallback` 编排属于上层 DNS 服务，不在本 package 内实现。
 
 ## 文档
@@ -40,7 +40,7 @@ ForgeRuleCore 是供路由与 DNS 共用的 Swift 规则内核，包含 `RuleCor
 ./Scripts/coverage.sh
 ```
 
-`./Scripts/ci.sh` 是本地与 GitHub Actions 共用的唯一完整门禁：执行 43 项测试治理下限、Debug/Release 测试、将严格 Swift 并发诊断视为错误、通用 iOS 15 arm64 构建，以及首方生产代码覆盖率。初始覆盖率 ratchet 为 67.00%；测试与 vendored `libmaxminddb` 不计入，但 package 自身 Swift 源码与 `GeoMMDBBridge.c` 均在范围内。依赖锁定到已审查的 ForgeBase 0.3.0，以获得 Swift 6 `Sendable` packet 契约。
+`./Scripts/ci.sh` 是本地与 GitHub Actions 共用的唯一完整门禁：执行 45 项测试治理下限、Debug/Release 测试、将严格 Swift 并发诊断视为错误、通用 iOS 15 arm64 构建，以及首方生产代码覆盖率。初始覆盖率 ratchet 为 67.00%；测试与 vendored `libmaxminddb` 不计入，但 package 自身 Swift 源码与 `GeoMMDBBridge.c` 均在范围内。依赖锁定到已审查的 ForgeBase 0.3.0，以获得 Swift 6 `Sendable` packet 契约。
 
 ## TODO
 

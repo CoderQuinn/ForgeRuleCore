@@ -6,7 +6,7 @@ import Testing
 // MARK: - Stubs / helpers
 // Contract IDs: see docs/CONTRACT-TESTS.md
 // C-GEOIP-MISS C-GEOIP-RESOLVED C-ANY-ORDER C-DEFAULT-DIRECT C-EVAL-NORMALIZE
-// C-PORT-PROTO-IGNORED C-COMPILER-DROP C-OUTBOUND-MAP C-GEOSITE-REGEX C-FIRST-WINS
+// C-PORT-PROTO-IGNORED C-COMPILER-DIAGNOSTICS C-OUTBOUND-MAP C-GEOSITE-REGEX C-FIRST-WINS
 
 private struct StubCountryLookup: CountryLookup {
     let codeByIP: [FBIPv4: CountryCode]
@@ -190,9 +190,9 @@ private func input(
     #expect(a == b)
 }
 
-// MARK: - C-COMPILER-DROP / C-OUTBOUND-MAP
+// MARK: - C-COMPILER-DIAGNOSTICS / C-OUTBOUND-MAP
 
-@Test func contract_compiler_silently_drops_unsupported_rows() {
+@Test func contract_compiler_reports_every_rejected_row() {
     let fields: [FieldRuleJSON] = [
         FieldRuleJSON(
             type: "field",
@@ -243,8 +243,118 @@ private func input(
             ip: nil,
             network: nil
         ),
+        FieldRuleJSON(
+            type: "field",
+            outboundTag: "Direct",
+            domain: nil,
+            ip: ["geoip:cn", "geoip:us"],
+            network: nil
+        ),
+        FieldRuleJSON(
+            type: "field",
+            outboundTag: "Direct",
+            domain: ["domain:"],
+            ip: nil,
+            network: nil
+        ),
+        FieldRuleJSON(
+            type: "field",
+            outboundTag: "Direct",
+            domain: nil,
+            ip: ["geoip:"],
+            network: nil
+        ),
+        FieldRuleJSON(
+            type: "field",
+            outboundTag: "Direct",
+            domain: nil,
+            ip: ["10.0.0.0/8"],
+            network: nil
+        ),
     ]
-    #expect(FieldRoutingRuleFactory.makeRules(from: fields).isEmpty)
+    let compilation = FieldRoutingRuleFactory.compile(fields: fields)
+
+    #expect(!compilation.isSuccessful)
+    #expect(compilation.rules.isEmpty)
+    #expect(compilation.diagnostics.map(\.fieldIndex) == Array(0..<11))
+    #expect(
+        compilation.diagnostics.map(\.reason) == [
+            .multipleDomainEntries,
+            .mixedDomainAndIP,
+            .unsupportedNetwork,
+            .unsupportedDomainEntry,
+            .unsupportedRuleType,
+            .missingOutboundTag,
+            .missingOutboundTag,
+            .multipleIPEntries,
+            .invalidDomainEntry,
+            .invalidIPEntry,
+            .unsupportedIPEntry,
+        ]
+    )
+}
+
+@Test func contract_compiler_partial_output_is_not_success() {
+    let fields: [FieldRuleJSON] = [
+        FieldRuleJSON(
+            type: "field",
+            outboundTag: "Direct",
+            domain: ["full:accepted.example"],
+            ip: nil,
+            network: nil
+        ),
+        FieldRuleJSON(
+            type: "field",
+            outboundTag: "Direct",
+            domain: nil,
+            ip: nil,
+            network: nil
+        ),
+        FieldRuleJSON(
+            type: "field",
+            outboundTag: "Reject",
+            domain: ["domain:blocked.example"],
+            ip: nil,
+            network: nil
+        ),
+    ]
+
+    let compilation = FieldRoutingRuleFactory.compile(fields: fields)
+    #expect(!compilation.isSuccessful)
+    #expect(compilation.rules.map(\.condition) == [
+        .domainFull("accepted.example"),
+        .domainSuffix("blocked.example"),
+    ])
+    #expect(compilation.diagnostics == [
+        FieldRoutingDiagnostic(fieldIndex: 1, reason: .missingCondition),
+    ])
+}
+
+@Test func contract_compiler_does_not_narrow_invalid_rows_before_validation() {
+    let fields: [FieldRuleJSON] = [
+        FieldRuleJSON(
+            type: "field",
+            outboundTag: "Direct",
+            domain: ["regexp:.*\\.example", "domain:accepted.example"],
+            ip: nil,
+            network: nil
+        ),
+        FieldRuleJSON(
+            type: "field",
+            outboundTag: "Direct",
+            domain: ["domain:accepted.example"],
+            ip: nil,
+            network: "quic"
+        ),
+    ]
+
+    let compilation = FieldRoutingRuleFactory.compile(fields: fields)
+    #expect(!compilation.isSuccessful)
+    #expect(compilation.rules.isEmpty)
+    #expect(compilation.diagnostics.map(\.reason) == [
+        .multipleDomainEntries,
+        .unsupportedNetwork,
+    ])
 }
 
 @Test func contract_outbound_tag_mapping() {

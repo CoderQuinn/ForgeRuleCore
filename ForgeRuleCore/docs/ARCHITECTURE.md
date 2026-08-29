@@ -72,7 +72,7 @@ libmaxminddb (C)
 |----|------|----------|
 | Kernel | 顺序评估 `Rule` → `RuleAction` | 稳定；Sendable 快照合适 |
 | Flow Adapter | FakeIP / domain 事实解析 | 边界清楚，可注入 |
-| Config Compiler | JSON field → `[Rule]` | narrow 可用；缺 diagnostics |
+| Config Compiler | JSON field → `[Rule]` | narrow 可用；拒绝项有显式 diagnostics |
 | GeoSite | 按站点建 full/suffix/keyword 索引 | 子集；`regex` / attributes 忽略 |
 | GeoMMDB | IPv4 → 国家码 | **风险高**：全局单例 |
 
@@ -172,11 +172,24 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 
 - 每个 `type: field` row 最多产出 **一条** primitive `Rule`。
 - 接受：单个 domain entry **或** 单个 `geoip:` entry。
-- **静默丢弃**（当前行为，已知缺陷）：多个 domain、`domain + ip`、可识别非空 `network`、`regexp:`、非法 / 空 `outboundTag`、非 `field` type。
+- `compile(fields:)` 返回保序的 accepted `rules` 与每个 rejected row 的 `fieldIndex` + 稳定 `reason`；只要存在 rejected row，`isSuccessful == false`。
+- 拒绝：多个 domain、`domain + ip`、任意非空 `network`、`regexp:`、非法 / 空 `outboundTag`、非 `field` type。
+- 验证以原始数组计数为准，不得先丢非法 entry 再把剩余 entry 当作有效 row。
 - `outboundTag`：`direct` → `.direct`；`reject` / `block` → `.reject`；其他非空 → `.proxy(tag)`。
 - DNS JSON（`DNSRoutingConfigJSON`）仅解码；不执行 DoH / fallback。
 
-长期目标：`compile(fields:) →` 带 `accepted` / `rejected(reason)` 的 diagnostics，禁止无痕迹丢规则。
+| Diagnostic reason | 拒绝条件 |
+|-------------------|----------|
+| `unsupported_rule_type` | `type` 不是 `field` |
+| `missing_outbound_tag` | `outboundTag` 缺失或为空 |
+| `unsupported_network` | `network` 非空 |
+| `mixed_domain_and_ip` | 同一 row 同时包含 domain 与 ip |
+| `multiple_domain_entries` / `multiple_ip_entries` | 同类 entry 超过一条 |
+| `missing_condition` | domain 与 ip 都没有 entry |
+| `invalid_domain_entry` / `invalid_ip_entry` | entry 为空或前缀 payload 为空 |
+| `unsupported_domain_entry` / `unsupported_ip_entry` | 非当前 narrow subset 的表达式 |
+
+`makeRule(from:)` / `makeRules(from:)` 仅为兼容旧调用方的 accepted-rules 投影，不携带 diagnostics。新集成必须调用 `compile(fields:)` 并在安装规则前要求 `isSuccessful`。
 
 ---
 
@@ -192,9 +205,9 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 
 **当前集成约束**：进程（或 Network Extension）内 **只应存在一个活跃 MMDB 路径**；不要并行打开多个 `MMDBReader` 指向不同文件。真正的热更新应通过 **整份 `RuleEngine` / `GeoIPDB` snapshot 替换** 实现，而不是依赖 `reopen()`。
 
-### 5.2 Compiler 静默丢规则
+### 5.2 Compiler 兼容投影
 
-配置意图与运行时规则集可能不一致，且无 API 反馈。接入方应在 diagnostics 落地前自行校验，或只下发已确认的 primitive 规则。
+`compile(fields:)` 会显式报告每个拒绝 row；但兼容 API `makeRule(from:)` / `makeRules(from:)` 仍只返回 accepted rules。接入方若用兼容投影直接安装部分规则，配置意图仍可能被缩窄。生产集成必须使用 compilation 结果并拒绝 `isSuccessful == false` 的配置。
 
 ### 5.3 性能量级（指导用）
 
@@ -234,7 +247,7 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 **已知缺口**：
 
 - 小型真实 `geoip.mmdb` fixture
-- compiler rejected reason（待 diagnostics API）
+- compiler rejected reason / source row index
 - 并发 classify / snapshot swap
 - Bundle 文件缺失细分错误
 - MMDB 多路径单例行为的进程级测试
@@ -261,7 +274,7 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 
 - [x] README routing 范围与 narrow compiler 对齐
 - [x] 架构文档写死：`geoip:!cc` miss 行为、MMDB 单活跃库、`port`/`proto` reserved、`.any` 推荐置底
-- [ ] `FieldRoutingRuleFactory` diagnostics API（禁止静默丢规则无痕迹）
+- [x] `FieldRoutingRuleFactory` diagnostics API（拒绝 row 带稳定 reason 与原始下标；部分结果不报告成功）
 - [ ] MMDB：文档约束落地为 API 保障，或改为 per-instance `MMDB_s*`；收敛 / 隐藏误导性 `reopen()`
 - [x] 回归测试：`geoip:!cc` + lookup miss；（若保留全局 bridge）单路径约束说明测试 — miss 契约见 `ContractRegressionTests` / [CONTRACT-TESTS.md](./CONTRACT-TESTS.md)；MMDB 多路径仍待 API 保障
 
@@ -290,7 +303,7 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 
 ### Next（当前冲刺）
 
-1. Compiler diagnostics  
+1. Compiler diagnostics（已完成）
 2. MMDB 单实例约束产品化（API 或 per-instance）  
 3. `geoip:!` miss 契约测试  
 4. `IP-CIDR` / `IP-CIDR6`  

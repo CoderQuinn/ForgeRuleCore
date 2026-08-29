@@ -47,7 +47,7 @@ done < <(grep -Eo 'C-[A-Z0-9-]+' "$PLAN" | sort -u)
 for name in \
   contract_geoip_negation_hits_on_lookup_miss \
   contract_geoip_uses_resolved_ip_not_original \
-  contract_compiler_silently_drops_unsupported_rows
+  contract_compiler_reports_every_rejected_row
 do
   grep -Fq "func ${name}" "$CONTRACTS" || die "missing required contract test: $name"
 done
