@@ -104,7 +104,7 @@ macOS runner tools and do not require `rg`.
 
 1. Required test files exist (including `ContractRegressionTests.swift`).
 2. No XCTest / `example()` placeholders in the test target.
-3. `@Test` count ≥ `docs/test-baseline.json` → `min_test_count` (currently **68**).
+3. `@Test` count ≥ `docs/test-baseline.json` → `min_test_count` (currently **69**).
 4. Critical contract test symbols are present.
 
 **To lower the baseline**: only with explicit PR rationale tied to ARCHITECTURE / CONTRACT-TESTS. Prefer never lowering; delete dead tests carefully and keep count stable or rising.

@@ -43,7 +43,7 @@ Swift package: shared **rule kernel** for routing and DNS (`RuleCore`, `GeoSiteD
 ```
 
 `./Scripts/ci.sh` is the canonical local and GitHub Actions gate. It runs the
-68-test governance floor, clean Debug and Release builds/tests, strict Swift
+69-test governance floor, clean Debug and Release builds/tests, strict Swift
 concurrency diagnostics as errors, a generic iOS 15 arm64 build, and
 first-party production coverage. The coverage gate is 95.00% (current baseline:
 715/747 lines, 95.72%); vendored `libmaxminddb` and tests are excluded, while
