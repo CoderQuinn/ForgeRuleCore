@@ -50,7 +50,7 @@
 
 ```
 ForgeRuleCoreBundle.makeRuleCore / makeFlowClassifier
-  → geosite.json + geoip.mmdb
+  → App Group/Rules/geosite.json + geoip.mmdb
   → GeoSiteDB + GeoIPDB(preheatKeys) + RuleEngine
 ```
 

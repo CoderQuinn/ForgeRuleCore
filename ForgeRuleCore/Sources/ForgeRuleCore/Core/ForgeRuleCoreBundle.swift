@@ -47,6 +47,9 @@ extension ForgeRuleCoreBundleError: LocalizedError {
 }
 
 public enum ForgeRuleCoreBundle {
+    /// Relative directory shared with the QuantumLink App Group path contract.
+    public static let rulesSubdirectory = "Rules"
+
     public static func makeRuleCore(
         appGroup: String,
         rules: [Rule]
@@ -74,7 +77,8 @@ public enum ForgeRuleCoreBundle {
             throw ForgeRuleCoreBundleError.invalidAppGroupIdentifier(appGroup)
         }
 
-        return try makeRuleCore(resourceDirectory: base, rules: rules)
+        let rulesDirectory = base.appendingPathComponent(rulesSubdirectory, isDirectory: true)
+        return try makeRuleCore(resourceDirectory: rulesDirectory, rules: rules)
     }
 
     static func makeRuleCore(
