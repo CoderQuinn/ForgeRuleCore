@@ -2,8 +2,8 @@
 
 > **目的**：把 `ARCHITECTURE.md` 中的稳定契约落成可执行测试，防止语义漂移。  
 > **日期**：2026-07-22  
-> **范围**：单元测试 + 契约回归（不含真实 MMDB fixture、不含 App Group Bundle I/O）  
-> **实现文件**：`Tests/ForgeRuleCoreTests/ContractRegressionTests.swift`
+> **范围**：单元测试 + 契约回归（含小型官方 MMDB fixture；不含 App Group Bundle I/O）
+> **实现文件**：`Tests/ForgeRuleCoreTests/ContractRegressionTests.swift`、`MMDBReaderContractTests.swift`
 
 ---
 
@@ -31,6 +31,9 @@
 | C-OUTBOUND-MAP | §4.5 | tag 映射漂移 |
 | C-GEOSITE-REGEX | §4.3 | 误以为 regex 生效 |
 | C-FIRST-WINS | §4.2 #4 | 多规则命中顺序错误 |
+| C-MMDB-BYTE-ORDER | §5.1 | `FBIPv4.beValue` 在 C ABI 边界反序，真实 lookup 恒 miss |
+| C-MMDB-OWNERSHIP | §5.1 | 不同 reader 静默共用全局数据库或互相污染 |
+| C-MMDB-TEARDOWN | §5.1 | 一个 reader 析构使另一个 reader 失效或泄漏全局句柄 |
 
 ---
 
@@ -51,10 +54,9 @@
 
 ### 2.3 明确不在本 PR
 
-- 真实 `geoip.mmdb` / 官方 geosite 大文件
-- `MMDBReader` 多路径全局单例（需进程级隔离，另开）
+- 大型生产 `geoip.mmdb` / 官方 geosite 大文件
 - `ForgeRuleCoreBundle` App Group（需 mock FileManager）
-- Compiler diagnostics API（稳定 reason、源 row 下标、partial output 非 success）
+- Compiler composite-condition 支持（当前 diagnostics 已覆盖 narrow compiler 的拒绝路径）
 
 ---
 
@@ -138,6 +140,16 @@
 ### C-FIRST-WINS
 
 两条均可命中的 suffix 规则，只返回第一条的 action。
+
+### C-MMDB-BYTE-ORDER / C-MMDB-OWNERSHIP / C-MMDB-TEARDOWN
+
+固定到官方 MaxMind test-data commit 的小型 fixture 写死以下契约：
+
+- `214.78.120.1` 在 `GeoIP2-Country-Test.mmdb` 中返回 `US`，锁定 Swift `FBIPv4.beValue` 到 C `sockaddr_in` 的字节序。
+- country fixture 与 string-value fixture 可同时打开；同一 IP 的 country lookup 结果彼此独立。
+- 已有有效 reader 时，打开缺失路径仍必须失败，不能静默借用已有数据库。
+- 一个 reader teardown 后，另一个 reader 仍可继续 lookup。
+- fixture 的 upstream commit、MIT license 与 SHA-256 记录在 `Tests/ForgeRuleCoreTests/Fixtures/`。
 
 ---
 

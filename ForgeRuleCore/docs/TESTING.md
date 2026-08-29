@@ -55,6 +55,7 @@ ForgeRuleCore/Tests/ForgeRuleCoreTests/
 | Which IP field geo uses | `C-GEOIP-RESOLVED` |
 | `FieldRoutingRuleFactory` accept/reject | factory tests + `C-COMPILER-DIAGNOSTICS` / `C-OUTBOUND-MAP` |
 | GeoSite full/suffix/keyword/regex ignore | GeoSite tests + `C-GEOSITE-REGEX` |
+| MMDB ABI / IPv4 byte order / reader lifecycle | `MMDBReaderContractTests` + `C-MMDB-*` |
 | `normalizeDomain` / `normalizeGeoipKey` | helper unit tests |
 | New ARCHITECTURE §4 bullet | New `C-*` row in CONTRACT-TESTS.md **and** a regression test |
 
@@ -100,7 +101,7 @@ macOS runner tools and do not require `rg`.
 
 1. Required test files exist (including `ContractRegressionTests.swift`).
 2. No XCTest / `example()` placeholders in the test target.
-3. `@Test` count ≥ `docs/test-baseline.json` → `min_test_count` (currently **45**).
+3. `@Test` count ≥ `docs/test-baseline.json` → `min_test_count` (currently **49**).
 4. Critical contract test symbols are present.
 
 **To lower the baseline**: only with explicit PR rationale tied to ARCHITECTURE / CONTRACT-TESTS. Prefer never lowering; delete dead tests carefully and keep count stable or rising.
@@ -138,9 +139,9 @@ PR rationale.
 
 ## 9. Out of scope (for now)
 
-- Real `geoip.mmdb` / large geosite fixtures (tracked in ARCHITECTURE gaps)
+- Large production `geoip.mmdb` / geosite fixtures (small pinned official MMDB fixtures are covered)
 - App Group / `ForgeRuleCoreBundle` I/O tests
-- Process-global MMDB multi-path tests
+- Snapshot-provider reload and concurrent replacement tests
 - Mixing XCTest
 
 ---

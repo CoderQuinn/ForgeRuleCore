@@ -11,37 +11,28 @@ import Foundation
 import GeoMMDBBridge
 
 public final class MMDBReader: GeoIPProvider, @unchecked Sendable {
-    private static let queue = DispatchQueue(label: "ForgeMMDB.reader")
+    private let queue = DispatchQueue(label: "ForgeRuleCore.MMDBReader")
+    private let handle: UnsafeMutableRawPointer
 
-    private let path: String
-
+    /// Opens an independently owned, immutable database handle.
     public init(url: URL) throws {
-        path = url.path
-        try Self.queue.sync {
-            let status = forge_mmdb_open(path)
-            guard status == 0 else { throw MMDBOpenError(status: status) }
+        var status: Int32 = 0
+        guard let handle = forge_mmdb_open(url.path, &status) else {
+            throw MMDBOpenError(status: status)
         }
+        self.handle = handle
     }
 
     deinit {
-        Self.queue.sync {
-            forge_mmdb_close()
-        }
-    }
-
-    /// hot reload support
-    public func reopen() throws {
-        try Self.queue.sync {
-            forge_mmdb_close()
-            let status = forge_mmdb_open(path)
-            guard status == 0 else { throw MMDBOpenError(status: status) }
+        queue.sync {
+            forge_mmdb_close(handle)
         }
     }
 
     @inline(__always)
     public func countryCode(of ip: FBIPv4) -> CountryCode? {
-        let packed = Self.queue.sync {
-            forge_mmdb_country_ipv4(ip.beValue)
+        let packed = queue.sync {
+            forge_mmdb_country_ipv4(handle, ip.beValue)
         }
         return CountryCode(packedBE: packed)
     }

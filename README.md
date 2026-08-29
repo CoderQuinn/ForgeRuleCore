@@ -23,6 +23,7 @@ Swift package: shared **rule kernel** for routing and DNS (`RuleCore`, `GeoSiteD
 
 - **Routing:** decode `RoutingConfigJSON`, then call `FieldRoutingRuleFactory.compile(fields:)`. The result contains ordered accepted rules plus a diagnostic with the original row index and stable reason for every rejection; require `isSuccessful` before installing the rules. `makeRule(from:)` and `makeRules(from:)` remain compatibility projections that omit diagnostics. The narrow compiler accepts one primitive per `field` row: a single `domain` entry (`geosite:` / `full:` / `domain:` / `keyword:` / plain suffix) or a single `ip` entry (`geoip:` / `geoip:!cn`). Multiple domain entries, domain+ip composition, any non-empty `network`, `regexp:`, and `IP-CIDR` are not supported yet.
 - **DNS:** decode `DNSRoutingConfigJSON` for `hosts` and mixed `servers` (string or object). DoH, `expectIPs` validation, and `skipFallback` orchestration belong in your DNS service, not in this package.
+- **GeoMMDB:** every `MMDBReader` owns an independent immutable database handle. Create a replacement rule snapshot to reload; there is no in-place `reopen`. Official pinned MaxMind test fixtures cover IPv4 byte order, independent databases, open failure isolation, and teardown.
 
 ## Docs
 
@@ -41,7 +42,7 @@ Swift package: shared **rule kernel** for routing and DNS (`RuleCore`, `GeoSiteD
 ```
 
 `./Scripts/ci.sh` is the canonical local and GitHub Actions gate. It runs the
-45-test governance floor, clean Debug and Release builds/tests, strict Swift
+49-test governance floor, clean Debug and Release builds/tests, strict Swift
 concurrency diagnostics as errors, a generic iOS 15 arm64 build, and
 first-party production coverage. The initial coverage ratchet is 67.00%;
 vendored `libmaxminddb` and tests are excluded, while the package's own Swift
