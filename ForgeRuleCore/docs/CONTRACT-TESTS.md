@@ -2,8 +2,8 @@
 
 > **目的**：把 `ARCHITECTURE.md` 中的稳定契约落成可执行测试，防止语义漂移。  
 > **日期**：2026-07-22  
-> **范围**：单元测试 + 契约回归（含小型官方 MMDB fixture；不含 App Group Bundle I/O）
-> **实现文件**：`Tests/ForgeRuleCoreTests/ContractRegressionTests.swift`、`MMDBReaderContractTests.swift`
+> **范围**：单元测试 + 契约回归（含小型官方 MMDB fixture 与可注入 App Group bundle I/O）
+> **实现文件**：`ContractRegressionTests.swift`、`MMDBReaderContractTests.swift`、`ForgeRuleCoreBundleContractTests.swift`
 
 ---
 
@@ -34,6 +34,9 @@
 | C-MMDB-BYTE-ORDER | §5.1 | `FBIPv4.beValue` 在 C ABI 边界反序，真实 lookup 恒 miss |
 | C-MMDB-OWNERSHIP | §5.1 | 不同 reader 静默共用全局数据库或互相污染 |
 | C-MMDB-TEARDOWN | §5.1 | 一个 reader 析构使另一个 reader 失效或泄漏全局句柄 |
+| C-BUNDLE-ASSEMBLY | §8 | App Group 路径未真实装配 GeoSite 与 GeoIP |
+| C-BUNDLE-LAYOUT | §8 | 固定资源名或容器解析契约漂移 |
+| C-BUNDLE-ERRORS | §9 P2 | 缺文件与坏数据无法稳定分类，Extension 启动难排障 |
 
 ---
 
@@ -55,7 +58,7 @@
 ### 2.3 明确不在本 PR
 
 - 大型生产 `geoip.mmdb` / 官方 geosite 大文件
-- `ForgeRuleCoreBundle` App Group（需 mock FileManager）
+- bundle 版本 manifest、checksum 与 atomic reload / rollback
 - Compiler composite-condition 支持（当前 diagnostics 已覆盖 narrow compiler 的拒绝路径）
 
 ---
@@ -150,6 +153,17 @@
 - 已有有效 reader 时，打开缺失路径仍必须失败，不能静默借用已有数据库。
 - 一个 reader teardown 后，另一个 reader 仍可继续 lookup。
 - fixture 的 upstream commit、MIT license 与 SHA-256 记录在 `Tests/ForgeRuleCoreTests/Fixtures/`。
+
+### C-BUNDLE-ASSEMBLY / C-BUNDLE-LAYOUT / C-BUNDLE-ERRORS
+
+通过内部同步 resolver seam 把临时目录解析为指定 App Group container，并写死以下契约：
+
+- container 根目录的固定文件名为 `geosite.json` 与 `geoip.mmdb`，两者必须存在且不可为目录。
+- 有效 ForgeRules 格式 geosite fixture 与固定官方 MMDB fixture 可装配为同一 `RuleCore`，且真实 geosite / geoip 规则均命中。
+- 空白或无法解析的 App Group 返回 `invalidAppGroupIdentifier`。
+- 缺任一固定资源返回带 resource 与 path 的 `missingResource`。
+- 合法 JSON 但 schema 不完整的 geosite、以及非 MMDB 数据，分别返回带稳定 failure 分类的 `invalidResource`。
+- 版本 manifest、checksum、atomic snapshot swap 与 rollback 不属于 bundle loader 本身。
 
 ---
 

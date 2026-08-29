@@ -249,10 +249,9 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 **已知缺口**：
 
 - 大型生产 `geoip.mmdb` fixture 与更多国家/边界样例（小型官方 fixture 已覆盖 reader contract）
-- compiler rejected reason / source row index
 - 并发 classify / snapshot swap
-- Bundle 文件缺失细分错误
-- MMDB 多路径单例行为的进程级测试
+- Bundle 版本 manifest、checksum 与 rollback
+
 ---
 
 ## 8. QuantumLink / NetForge 集成
@@ -260,7 +259,7 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 | 阶段 | 工作 | 状态 |
 |------|------|------|
 | Phase 2 | Extension 链接 ForgeRuleCore SPM | 规划 |
-| Phase 2 | App Group 加载 geosite / geoip | Bundle 已有；缺文件诊断 |
+| Phase 2 | App Group 加载 geosite / geoip | 固定 layout、真实 I/O 与错误分类已覆盖；版本/reload 待 host |
 | Phase 2 | NetForge `TrafficPolicyProvider` → `evaluate` | 规划 |
 | Phase 2 | 热更新：snapshot swap + provider message | 规划；reader handle 已支持并存 |
 
@@ -292,7 +291,8 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 
 - [ ] `RuleCoreSnapshot` / `RuleCoreProvider`：atomic swap（rules + GeoSite + GeoIP）
 - [ ] 线程安全：classify 可并发；reload 不长时间阻塞读路径
-- [ ] `ForgeRuleCoreBundle`：文件存在性、版本、错误细分
+- [x] `ForgeRuleCoreBundle`：可注入 App Group resolver、文件存在性与稳定错误细分
+- [ ] Bundle manifest：版本、checksum、兼容性与 rollback 信息
 - [ ] NetForge `PolicyDecision` / QuantumLink provider message 类型映射
 
 ### P3 — 兼容性与性能
@@ -307,7 +307,7 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 
 1. Compiler diagnostics（已完成）
 2. MMDB per-instance ownership（已完成）
-3. `geoip:!` miss 契约测试  
+3. App Group bundle I/O / error contracts（已完成）
 4. `IP-CIDR` / `IP-CIDR6`  
 5. Composite condition model  
 6. Reloadable snapshot provider  
