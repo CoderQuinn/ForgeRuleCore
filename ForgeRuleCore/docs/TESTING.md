@@ -1,7 +1,7 @@
 # ForgeRuleCore Unit Test Governance
 
-> **Status**: binding for contributors and CI  
-> **Last updated**: 2026-07-22  
+> **Status**: binding for contributors and CI
+> **Last updated**: 2026-08-29
 > **Package root**: `ForgeRuleCore/` (SPM lives here, not repo root)
 
 This document defines how unit and contract-regression tests are organized, what CI enforces, and what a PR that touches matching semantics must include.
@@ -65,7 +65,10 @@ Material contract changes must update [ARCHITECTURE.md](./ARCHITECTURE.md) in th
 ## 5. How to run
 
 ```bash
-# From repo root — canonical (same as CI unit-test job)
+# From repo root — canonical full gate (same as GitHub Actions)
+./Scripts/ci.sh
+
+# Fast Debug build/test entrypoint
 ./Scripts/run-tests.sh
 
 # Governance gate only (no compile)
@@ -83,8 +86,11 @@ CI workflows (repo root `.github/workflows/`):
 
 | Workflow | File | What it runs |
 |----------|------|----------------|
-| **CI** | `ci.yml` | governance + build + full `swift test` |
-| **Unit Tests** | `unit-tests.yml` | governance + `./Scripts/run-tests.sh` |
+| **CI / Tests** | `ci.yml` | `./Scripts/ci.sh`: governance, clean Debug/Release and strict-concurrency tests, generic iOS build, and production coverage |
+
+The workflow grants only `contents: read`, pins every external action to a full
+commit SHA, and avoids a duplicate test workflow. The scripts use standard
+macOS runner tools and do not require `rg`.
 
 ---
 
@@ -107,7 +113,7 @@ CI workflows (repo root `.github/workflows/`):
 - [ ] Contract / semantic changes update `ARCHITECTURE.md` and `CONTRACT-TESTS.md` when applicable.
 - [ ] Still Swift Testing only (no XCTest in this package).
 - [ ] `./Scripts/check-test-governance.sh` passes.
-- [ ] `./Scripts/run-tests.sh` passes locally (or CI green on the PR).
+- [ ] `./Scripts/ci.sh` passes locally (or CI is green on the PR).
 - [ ] If removing tests, `min_test_count` change is explained.
 
 ---
@@ -116,12 +122,17 @@ CI workflows (repo root `.github/workflows/`):
 
 README surfaces:
 
-- **CI** — overall build + test workflow status
-- **Unit Tests** — dedicated unit-test workflow status
+- **CI** — the single required build, test, platform, and coverage workflow
 - **Swift Testing** — static policy badge linking here
 - **SPM** / platform — static metadata badges
 
-Coverage percentage badge is **not** required for MVP; when added later, store summary under `docs/` or `badges/` and document the collector command here.
+`Scripts/coverage.sh` enforces an initial 67.00% first-party production line
+coverage ratchet. It includes the package's Swift sources and
+`GeoMMDBBridge.c`, while excluding tests and vendored `libmaxminddb`. The
+generated summary is written to
+`ForgeRuleCore/.build/coverage/production-summary.md` and published in the CI
+job summary. Raising the threshold is preferred; lowering it requires explicit
+PR rationale.
 
 ---
 

@@ -1,65 +1,44 @@
-name: CI
+name: CI / Tests
 
 on:
   push:
-    branches: [main, "feat-*", "docs/**", "hotfix*", "release/*"]
+    branches:
+      - main
+      - feat-0.1.0
   pull_request:
-    branches: [main, "feat-*"]
-  workflow_dispatch:
+    branches:
+      - main
+      - feat-0.1.0
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    name: Build & Test (macOS)
+  swift-package-gate:
+    name: macOS Swift package gate
     runs-on: macos-15
     timeout-minutes: 30
 
-    defaults:
-      run:
-        working-directory: ForgeRuleCore
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
-      - name: Select Xcode
-        uses: maxim-lobanov/setup-xcode@v1
+      - name: Select Xcode 16.4
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90
         with:
           xcode-version: "16.4"
 
-      - name: Cache SwiftPM
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.swiftpm
-            ForgeRuleCore/.build
-          key: ${{ runner.os }}-spm-${{ hashFiles('ForgeRuleCore/Package.swift', 'ForgeRuleCore/**/Package.resolved') }}-${{ hashFiles('.github/workflows/ci.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-spm-
+      - name: Build, test, and enforce coverage
+        run: ./Scripts/ci.sh
 
-      - name: Swift toolchain
-        run: swift --version
-
-      - name: Test governance gate
-        working-directory: .
-        run: |
-          chmod +x Scripts/check-test-governance.sh Scripts/run-tests.sh
-          ./Scripts/check-test-governance.sh
-
-      - name: Build
-        run: swift build
-
-      - name: Unit tests
-        run: swift test
-
-      - name: Summarize
+      - name: Publish production coverage summary
         if: always()
-        working-directory: .
         run: |
-          echo "### ForgeRuleCore CI" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Package: \`ForgeRuleCore/\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Governance: \`./Scripts/check-test-governance.sh\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Tests: \`swift test\` (policy: ForgeRuleCore/docs/TESTING.md)" >> "$GITHUB_STEP_SUMMARY"
+          summary="ForgeRuleCore/.build/coverage/production-summary.md"
+          if [[ -f "${summary}" ]]; then
+            cat "${summary}" >> "${GITHUB_STEP_SUMMARY}"
+          fi

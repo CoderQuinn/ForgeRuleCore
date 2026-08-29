@@ -5,8 +5,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/CoderQuinn/ForgeBase.git",
       "state" : {
-        "revision" : "c00dc3d628e3375919d3b176e70d72c91d260a6e",
-        "version" : "0.2.1"
+        "revision" : "d1f6656ef8f674277484ca54237a0eeb40c8b3c3",
+        "version" : "0.3.0"
       }
     }
   ],

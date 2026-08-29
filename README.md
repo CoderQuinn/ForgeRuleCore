@@ -1,7 +1,11 @@
 # ForgeRuleCore
 
-[![CI](https://github.com/CoderQuinn/ForgeRuleCore/actions/workflows/ci.yml/badge.svg)](https://github.com/CoderQuinn/ForgeRuleCore/actions/workflows/ci.yml)
-[![Unit Tests](https://github.com/CoderQuinn/ForgeRuleCore/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/CoderQuinn/ForgeRuleCore/actions/workflows/unit-tests.yml)
+<p align="center">
+  <strong>English</strong> |
+  <a href="README.zh-CN.md">简体中文</a>
+</p>
+
+[![CI](https://github.com/CoderQuinn/ForgeRuleCore/actions/workflows/ci.yml/badge.svg?branch=feat-0.1.0)](https://github.com/CoderQuinn/ForgeRuleCore/actions/workflows/ci.yml)
 ![Swift Testing](https://img.shields.io/badge/tests-Swift_Testing-orange?logo=swift)
 ![Status](https://img.shields.io/badge/status-mvp_kernel-blue)
 ![Platform](https://img.shields.io/badge/platform-iOS%2015%2B%20%7C%20macOS%2013%2B-blue)
@@ -30,9 +34,19 @@ Swift package: shared **rule kernel** for routing and DNS (`RuleCore`, `GeoSiteD
 ## Test locally
 
 ```bash
+./Scripts/ci.sh
 ./Scripts/check-test-governance.sh
 ./Scripts/run-tests.sh
+./Scripts/coverage.sh
 ```
+
+`./Scripts/ci.sh` is the canonical local and GitHub Actions gate. It runs the
+43-test governance floor, clean Debug and Release builds/tests, strict Swift
+concurrency diagnostics as errors, a generic iOS 15 arm64 build, and
+first-party production coverage. The initial coverage ratchet is 67.00%;
+vendored `libmaxminddb` and tests are excluded, while the package's own Swift
+sources and `GeoMMDBBridge.c` remain in scope. The resolved ForgeBase baseline
+is 0.3.0, which supplies the reviewed Swift 6 `Sendable` packet contracts.
 
 ## TODO
 
