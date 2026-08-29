@@ -65,21 +65,26 @@ private func expectBundleError(
 }
 
 @Test func bundle_app_group_assembly_loads_real_geosite_and_geoip_fixtures() throws {
-    let directory = try makeTemporaryBundleDirectory()
-    defer { try? FileManager.default.removeItem(at: directory) }
+    let container = try makeTemporaryBundleDirectory()
+    defer { try? FileManager.default.removeItem(at: container) }
+    let rulesDirectory = container.appendingPathComponent(
+        ForgeRuleCoreBundle.rulesSubdirectory,
+        isDirectory: true
+    )
+    try FileManager.default.createDirectory(at: rulesDirectory, withIntermediateDirectories: true)
 
     try installBundleFixture(
         "geosite-valid",
         extension: "json",
         as: ForgeRuleCoreBundleResource.geosite.rawValue,
-        in: directory
+        in: rulesDirectory
     )
     try installBundleFixture(
         "GeoIP2-Country-Test",
         extension: "mmdb",
         subdirectory: "Fixtures",
         as: ForgeRuleCoreBundleResource.geoIP.rawValue,
-        in: directory
+        in: rulesDirectory
     )
 
     let appGroup = "group.com.coderquinn.forge-rule-core.tests"
@@ -90,7 +95,7 @@ private func expectBundleError(
             Rule(condition: .geoip("us"), action: .proxy("geoip")),
         ],
         containerURLResolver: { identifier in
-            identifier == appGroup ? directory : nil
+            identifier == appGroup ? container : nil
         }
     )
 

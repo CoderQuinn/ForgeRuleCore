@@ -24,7 +24,7 @@ ForgeRuleCore 是供路由与 DNS 共用的 Swift 规则内核，包含 `RuleCor
 - **路由：** 解码 `RoutingConfigJSON`，再调用 `FieldRoutingRuleFactory.compile(fields:)`。结果包含保序的已接受规则，以及每个被拒绝 row 的原始下标和稳定 reason；安装规则前必须确认 `isSuccessful`。`makeRule(from:)` 与 `makeRules(from:)` 作为兼容投影保留，但不返回 diagnostics。当前 narrow compiler 每个 `field` 行只接受一个 primitive：单条 `domain`（`geosite:` / `full:` / `domain:` / `keyword:` / 普通后缀）或单条 `ip`（`geoip:` / `geoip:!cn`）。多条 domain、domain+ip 组合、任意非空 `network`、`regexp:` 与 `IP-CIDR` 尚不支持。
 - **DNS：** 通过 `DNSRoutingConfigJSON` 解码 `hosts` 与字符串/对象混合的 `servers`。DoH、`expectIPs` 校验和 `skipFallback` 编排属于上层 DNS 服务，不在本 package 内实现。
 - **GeoMMDB：** 每个 `MMDBReader` 独立拥有一个不可变 database handle。reload 应创建新的完整规则 snapshot 后替换，不再提供原地 `reopen`。固定版本的 MaxMind 官方测试库覆盖 IPv4 字节序、不同数据库并存、打开失败隔离与 teardown。
-- **Bundle 装配：** App Group 根目录必须包含名为 `geosite.json` 与 `geoip.mmdb` 的文件（不可为目录）。`ForgeRuleCoreBundleError` 可区分容器无法解析、资源缺失、geosite 数据损坏与 MMDB 打开失败；资源版本和原子 snapshot 替换仍由 host 负责。
+- **Bundle 装配：** App Group container 必须包含 `Rules/geosite.json` 与 `Rules/geoip.mmdb` 文件，与 QuantumLink 路径契约一致。`ForgeRuleCoreBundleError` 可区分容器无法解析、资源缺失、geosite 数据损坏与 MMDB 打开失败；资源版本和原子 snapshot 替换仍由 host 负责。
 
 ## 文档
 

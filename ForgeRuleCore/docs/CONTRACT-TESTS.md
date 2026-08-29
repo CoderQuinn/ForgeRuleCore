@@ -158,7 +158,7 @@
 
 通过内部同步 resolver seam 把临时目录解析为指定 App Group container，并写死以下契约：
 
-- container 根目录的固定文件名为 `geosite.json` 与 `geoip.mmdb`，两者必须存在且不可为目录。
+- container 下固定读取 `Rules/geosite.json` 与 `Rules/geoip.mmdb`，与 QuantumLink 0.8.0 App Group contract 一致；两者必须存在且不可为目录。
 - 有效 ForgeRules 格式 geosite fixture 与固定官方 MMDB fixture 可装配为同一 `RuleCore`，且真实 geosite / geoip 规则均命中。
 - 空白或无法解析的 App Group 返回 `invalidAppGroupIdentifier`。
 - 缺任一固定资源返回带 resource 与 path 的 `missingResource`。
