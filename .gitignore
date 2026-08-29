@@ -30,6 +30,11 @@ playground.xcworkspace
 # .swiftpm
 
 .build/
+**/.build/
+
+# Accidental Finder duplicate copies ("foo 2.swift")
+*[[:space:]]2.*
+*[[:space:]]2/
 
 # CocoaPods
 #
