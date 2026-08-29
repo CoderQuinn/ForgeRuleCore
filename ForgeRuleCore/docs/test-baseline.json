@@ -1,12 +1,13 @@
 {
   "package": "ForgeRuleCore",
   "framework": "Swift Testing",
-  "min_test_count": 49,
+  "min_test_count": 56,
   "required_files": [
     "ForgeRuleCoreTests.swift",
     "RuleEngineAndMatchersTests.swift",
     "ContractRegressionTests.swift",
-    "MMDBReaderContractTests.swift"
+    "MMDBReaderContractTests.swift",
+    "ForgeRuleCoreBundleContractTests.swift"
   ],
   "updated": "2026-08-29",
   "notes": "Bump min_test_count only when intentionally removing tests; never lower without ARCHITECTURE / CONTRACT-TESTS rationale in the PR."

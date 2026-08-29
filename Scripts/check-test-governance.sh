@@ -14,6 +14,7 @@ die() { echo "governance FAIL: $*" >&2; exit 1; }
 [[ -f "$TESTS/ForgeRuleCoreTests.swift" ]] || die "missing ForgeRuleCoreTests.swift"
 [[ -f "$TESTS/RuleEngineAndMatchersTests.swift" ]] || die "missing RuleEngineAndMatchersTests.swift"
 [[ -f "$TESTS/MMDBReaderContractTests.swift" ]] || die "missing MMDBReaderContractTests.swift"
+[[ -f "$TESTS/ForgeRuleCoreBundleContractTests.swift" ]] || die "missing ForgeRuleCoreBundleContractTests.swift"
 [[ -f "$BASELINE" ]] || die "missing baseline: $BASELINE"
 
 # Forbid XCTest placeholders and mixed frameworks in this package.
@@ -50,7 +51,10 @@ for name in \
   contract_compiler_reports_every_rejected_row \
   mmdb_reader_reads_official_country_fixture \
   mmdb_readers_own_independent_database_handles \
-  mmdb_reader_teardown_does_not_invalidate_another_reader
+  mmdb_reader_teardown_does_not_invalidate_another_reader \
+  bundle_app_group_assembly_loads_real_geosite_and_geoip_fixtures \
+  bundle_assembly_reports_missing_geosite \
+  bundle_assembly_reports_malformed_geoip
 do
   grep -Fq "func ${name}" "$TESTS"/*.swift || die "missing required contract test: $name"
 done
