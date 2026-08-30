@@ -1,7 +1,7 @@
 {
   "package": "ForgeRuleCore",
   "framework": "Swift Testing",
-  "min_test_count": 68,
+  "min_test_count": 69,
   "required_files": [
     "ForgeRuleCoreTests.swift",
     "RuleEngineAndMatchersTests.swift",

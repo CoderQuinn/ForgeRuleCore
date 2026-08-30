@@ -1,3 +1,4 @@
+import CryptoKit
 import ForgeBase
 import Foundation
 import Testing
@@ -37,6 +38,26 @@ private func installBundleFixture(
         at: source,
         to: directory.appendingPathComponent(destinationName)
     )
+}
+
+@Test func forge_rules_geosite_fixture_matches_pinned_provenance() throws {
+    guard
+        let fixtureURL = Bundle.module.url(
+            forResource: "geosite-valid",
+            withExtension: "json",
+            subdirectory: "Fixtures/Bundle"
+        )
+    else {
+        throw BundleFixtureError.missing("geosite-valid")
+    }
+
+    let fixture = try Data(contentsOf: fixtureURL)
+    let digest = SHA256.hash(data: fixture)
+        .map { String(format: "%02x", $0) }
+        .joined()
+    let expectedDigest = "0f224dfb0a0ef20db3033aeb588523c733518d6c82d06f8f393bc967e1d212e3"
+
+    #expect(digest == expectedDigest)
 }
 
 private func bundleInput(domain: String?, ip: FBIPv4) -> RuleInput {
