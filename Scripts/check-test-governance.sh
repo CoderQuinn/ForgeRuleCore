@@ -17,6 +17,7 @@ die() { echo "governance FAIL: $*" >&2; exit 1; }
 [[ -f "$TESTS/ForgeRuleCoreBundleContractTests.swift" ]] || die "missing ForgeRuleCoreBundleContractTests.swift"
 [[ -f "$TESTS/SerializationAndBoundaryTests.swift" ]] || die "missing SerializationAndBoundaryTests.swift"
 [[ -f "$TESTS/RevisionAndFactsContractTests.swift" ]] || die "missing RevisionAndFactsContractTests.swift"
+[[ -f "$TESTS/RuleCoreProviderContractTests.swift" ]] || die "missing RuleCoreProviderContractTests.swift"
 [[ -f "$BASELINE" ]] || die "missing baseline: $BASELINE"
 
 # Forbid XCTest placeholders and mixed frameworks in this package.
@@ -59,7 +60,11 @@ for name in \
   bundle_assembly_reports_malformed_geoip \
   rule_revision_requires_an_exact_nonempty_identity \
   resolver_preserves_dns_domain_revision_and_normalizes_the_fact \
-  flow_classifier_preserves_dns_fact_revision_across_a_new_snapshot
+  flow_classifier_preserves_dns_fact_revision_across_a_new_snapshot \
+  validated_reload_atomically_activates_and_retains_the_previous_snapshot \
+  slow_reload_validation_does_not_block_the_active_read_path \
+  concurrent_classification_never_mixes_snapshot_revision_and_decision \
+  validated_rollback_restores_previous_lkg_and_discards_failed_active
 do
   grep -Fq "func ${name}" "$TESTS"/*.swift || die "missing required contract test: $name"
 done

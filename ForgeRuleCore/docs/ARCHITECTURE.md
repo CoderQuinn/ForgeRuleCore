@@ -3,7 +3,7 @@
 > **角色**：不可变快照式 **routing / geo rule kernel** — `RuleEngine.evaluate` → Direct / Proxy / Reject  
 > **QuantumLink 中的位置**：L3 策略 — TCP accept + dial 决策 **之后**  
 > **当前兼容级别**：Xray / Surge 风格规则的 **narrow 子集**，不承诺完整兼容  
-> **成熟度**：MVP kernel（核心匹配可用）；生产接入仍须由 host 完成 atomic reload / rollback
+> **成熟度**：MVP kernel（核心匹配与 snapshot lifecycle 可用）；生产接入仍须由 host 提供版本、持久化与触发编排
 > **最后更新**：2026-08-30
 > **审查依据**：[技术文案.md](./技术文案.md)
 
@@ -16,10 +16,11 @@
 | 加载 `geosite.json` / `geoip.mmdb` | DNS 应答、DoH、fallback / `expectIPs` 编排（EchoForge / DNS service） |
 | 域名、后缀、关键字、GeoSite、GeoIP 匹配 | 包转发、socket 生命周期（NetForge） |
 | 将 `RuleInput` 评估为 `RuleAction` / `RouteDecision` | NE / UI / 持久化配置管理（QuantumLink） |
-| Flow 侧事实解析适配（`FlowFactsResolver`） | 规则订阅下载、文件更新策略 |
+| Flow 侧事实解析适配（`FlowFactsResolver`） | 规则订阅下载、文件更新与持久化策略 |
+| revisioned snapshot 的校验、原子激活与单级 LKG rollback | 何时更新/回滚、manifest/checksum 生成与存储 |
 | Xray-style routing / DNS **JSON 子集解码** | 完整 Xray / Surge 规则方言 |
 
-**设计原则**：包内只保留「加载 → 不可变快照 → 纯评估」；热更新、编排、策略类型映射由上层完成。
+**设计原则**：包内只保留「加载 → 不可变快照 → 校验后原子激活 → 纯评估」；下载、持久化、触发编排与策略类型映射由上层完成。
 
 ---
 
@@ -89,6 +90,7 @@ libmaxminddb (C)
 | `Rule` / `RuleCondition` / `RuleAction` | 规则原语 |
 | `RuleInput` / `RuleDomainFactSource` | 评估输入与 domain fact 来源 |
 | `RuleRevision` / `RuleClassification` | 不透明 snapshot identity 与详细分类结果 |
+| `RuleCoreSnapshot` / `RuleCoreProvider` | revisioned snapshot、atomic reload 与单级 LKG rollback |
 | `RuleEngine` / `RuleCore` | 评估与路由 |
 | `FlowRuleClassifier` / `FlowFactsResolving` / `FakeIPStore` | Flow 适配 |
 | `GeoSiteDB` / `GeoIPDB` / `CountryLookup` | Geo 依赖与注入点 |
@@ -120,7 +122,7 @@ public final class RuleEngine: Sendable {
 
 ### 4.2 Evaluation Semantics
 
-1. **不可变快照**：`RuleEngine` 初始化后 `rules` / geosite / geoip 引用不变；reload 必须由外层 atomic snapshot swap 完成（当前无内置 reload API）。
+1. **不可变快照**：`RuleEngine` 初始化后 `rules` / geosite / geoip 引用不变；`RuleCoreProvider` 在 validator 接受完整 `RuleCoreSnapshot` 后一次性替换 active 引用，不原地修改 engine 或 Geo DB。
 2. **自规范化**：`evaluate` **始终**对 `domain` 做 `normalizeDomain`（小写、去首尾空白与 `.`）；空串视为 `nil`。调用方无需依赖「已 resolve」才能安全评估，但 Flow 路径仍应先 `resolve` 以补全 FakeIP 域名。
 3. **顺序扫描**：按规则数组顺序。
 4. **首个非 `.any` 命中即返回**。
@@ -215,7 +217,16 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 - Swift/C 两个 target 使用相同的 `MMDB_UINT128_IS_BYTE_ARRAY` 定义，避免 `MMDB_entry_data_s` ABI 布局错读。
 - `FBIPv4.beValue` 在 C `sockaddr_in` 边界经 `htonl` 转换，真实 IPv4 fixture 锁定字节序。
 
-`MMDBReader` 不提供原地 `reopen()`。热更新必须先构建新的完整 `RuleEngine` / `GeoIPDB` snapshot，验证成功后由上层原子替换；旧 snapshot 可继续服务在途读取，直至其 reader 自然析构。
+`MMDBReader` 不提供原地 `reopen()`。热更新必须先构建新的完整 `RuleEngine` / `GeoIPDB` snapshot，再交给 `RuleCoreProvider` 校验并原子替换；旧 snapshot 可继续服务在途读取，直至其 reader 自然析构。
+
+### 5.2 Provider：atomic reload 与单级 LKG rollback
+
+- `RuleCoreSnapshot` 必须包含 host 提供的非空 `RuleRevision`；无 identity 的 `RuleCore` 不能被 provider 激活。
+- `RuleCoreProvider` 的 update lock 串行化 reload / rollback。validator 在不持有 read-state lock 时运行，因此慢校验不会阻塞当前 active snapshot 的 classify。
+- classify 只在短锁内捕获一个 immutable snapshot，实际评估在锁外完成；结果的 revision 与 decision 必须来自同一个 snapshot。
+- 成功 reload 把原 active 保存为唯一 previous LKG，再原子激活 candidate。重复 active revision 或 validator 拒绝时均保持 active / previous 不变。
+- rollback 对 previous LKG 再次校验；成功后恢复 LKG 并清空 previous，失败 active 不作为下一次 rollback candidate。无 LKG 或校验拒绝时状态不变。
+- validator 与 provider update API 不可重入：validator 不得回调同一 provider 的 `reload` / `rollback`。
 
 ### 5.2 Compiler 兼容投影
 
@@ -254,14 +265,14 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 - `RuleEngine` 顺序、`.any` fallback、域名规范化
 - **契约回归**（`ContractRegressionTests`）：见 [CONTRACT-TESTS.md](./CONTRACT-TESTS.md)
 - **治理**：见 [TESTING.md](./TESTING.md)；CI 跑 `Scripts/check-test-governance.sh` + `swift test`
+- **snapshot 生命周期**：atomic revision/decision consistency、慢校验读路径、拒绝状态保持与 LKG rollback
 
 **新增语义规则**：先补 fixture 或 table-driven / 契约测试，再改 matcher / compiler。
 
 **已知缺口**：
 
 - 大型生产 `geoip.mmdb` fixture 与更多国家/边界样例（小型官方 fixture 已覆盖 reader contract）
-- 并发 classify / snapshot swap
-- Bundle 版本 manifest、checksum 与 rollback
+- Bundle 版本 manifest、checksum 的生产格式与持久化
 
 ---
 
@@ -270,9 +281,9 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 | 阶段 | 工作 | 状态 |
 |------|------|------|
 | Phase 2 | Extension 链接 ForgeRuleCore SPM | 规划 |
-| Phase 2 | App Group 加载 geosite / geoip | 固定 layout、真实 I/O、错误分类与 host-supplied revision 已覆盖；reload 待 host |
+| Phase 2 | App Group 加载 geosite / geoip | 固定 layout、真实 I/O、错误分类与 host-supplied revision 已覆盖 |
 | Phase 2 | NetForge `TrafficPolicyProvider` → `evaluate` | 规划 |
-| Phase 2 | 热更新：snapshot swap + provider message | 规划；reader handle 已支持并存 |
+| Phase 2 | 热更新：snapshot swap + provider message | snapshot provider 已完成；host message / persistence 待集成 |
 
 **当前**：QuantumLink 侧主要是 App Group 文件通道；Xcode target 链接仍以规划为准。
 
@@ -300,11 +311,11 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 
 ### P2 — Reload 与集成生命周期
 
-- [ ] `RuleCoreSnapshot` / `RuleCoreProvider`：atomic swap（rules + GeoSite + GeoIP）
-- [ ] 线程安全：classify 可并发；reload 不长时间阻塞读路径
+- [x] `RuleCoreSnapshot` / `RuleCoreProvider`：atomic swap（rules + GeoSite + GeoIP）与单级 LKG rollback
+- [x] 线程安全：classify 可并发；reload validator 不持有读锁
 - [x] `ForgeRuleCoreBundle`：可注入 App Group resolver、文件存在性与稳定错误细分
 - [x] `RuleClassification`：保留 snapshot revision 与 DNS/flow domain fact provenance
-- [ ] Bundle manifest：版本、checksum、兼容性与 rollback 信息
+- [ ] Bundle manifest：版本、checksum、兼容性与持久化信息
 - [ ] NetForge `PolicyDecision` / QuantumLink provider message 类型映射
 
 ### P3 — 兼容性与性能
@@ -322,7 +333,7 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 3. App Group bundle I/O / error contracts（已完成）
 4. `IP-CIDR` / `IP-CIDR6`  
 5. Composite condition model  
-6. Reloadable snapshot provider  
+6. Reloadable snapshot provider（已完成）
 
 ---
 
@@ -338,6 +349,7 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 | 2026-07-19 | 吸收代码审查：数据流、stable API、Geo/`!cc`/MMDB 硬约束、TODO 重排 |
 | 2026-08-29 | compiler diagnostics；GeoMMDB per-reader handle 与真实 fixture contract |
 | 2026-08-30 | RuleRevision、domain fact provenance 与详细 classification envelope |
+| 2026-08-30 | RuleCoreProvider atomic reload、非阻塞校验与单级 LKG rollback |
 
 ---
 
