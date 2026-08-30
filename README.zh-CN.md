@@ -42,7 +42,7 @@ ForgeRuleCore 是供路由与 DNS 共用的 Swift 规则内核，包含 `RuleCor
 ./Scripts/coverage.sh
 ```
 
-`./Scripts/ci.sh` 是本地与 GitHub Actions 共用的唯一完整门禁：执行 56 项测试治理下限、Debug/Release 测试、将严格 Swift 并发诊断视为错误、通用 iOS 15 arm64 构建，以及首方生产代码覆盖率。初始覆盖率 ratchet 为 67.00%；测试与 vendored `libmaxminddb` 不计入，但 package 自身 Swift 源码与 `GeoMMDBBridge.c` 均在范围内。依赖锁定到已审查的 ForgeBase 0.3.0，以获得 Swift 6 `Sendable` packet 契约。
+`./Scripts/ci.sh` 是本地与 GitHub Actions 共用的唯一完整门禁：执行 68 项测试治理下限、Debug/Release 测试、将严格 Swift 并发诊断视为错误、通用 iOS 15 arm64 构建，以及首方生产代码覆盖率。覆盖率门槛为 95.00%（当前基线为 715/747 行，即 95.72%）；测试与 vendored `libmaxminddb` 不计入，但 package 自身 Swift 源码与 `GeoMMDBBridge.c` 均在范围内。依赖锁定到已审查的 ForgeBase 0.3.0，以获得 Swift 6 `Sendable` packet 契约。
 
 ## TODO
 

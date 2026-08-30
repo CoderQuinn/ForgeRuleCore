@@ -1,7 +1,7 @@
 # ForgeRuleCore Unit Test Governance
 
 > **Status**: binding for contributors and CI
-> **Last updated**: 2026-08-29
+> **Last updated**: 2026-08-30
 > **Package root**: `ForgeRuleCore/` (SPM lives here, not repo root)
 
 This document defines how unit and contract-regression tests are organized, what CI enforces, and what a PR that touches matching semantics must include.
@@ -36,6 +36,7 @@ ForgeRuleCore/Tests/ForgeRuleCoreTests/
   ForgeRuleCoreTests.swift           # FlowFactsResolver, field factory, DNS JSON
   RuleEngineAndMatchersTests.swift   # matchers, GeoIP/GeoSite stubs, RuleEngine basics
   ContractRegressionTests.swift      # C-* contract locks (see CONTRACT-TESTS.md)
+  SerializationAndBoundaryTests.swift # Codable, public API, and C bridge boundaries
 ```
 
 **Naming**
@@ -57,6 +58,7 @@ ForgeRuleCore/Tests/ForgeRuleCoreTests/
 | GeoSite full/suffix/keyword/regex ignore | GeoSite tests + `C-GEOSITE-REGEX` |
 | MMDB ABI / IPv4 byte order / reader lifecycle | `MMDBReaderContractTests` + `C-MMDB-*` |
 | App Group bundle layout / loader errors | `ForgeRuleCoreBundleContractTests` + `C-BUNDLE-*` |
+| Codable scalar values / public wrappers / null-safe C bridge | `SerializationAndBoundaryTests` |
 | `normalizeDomain` / `normalizeGeoipKey` | helper unit tests |
 | New ARCHITECTURE §4 bullet | New `C-*` row in CONTRACT-TESTS.md **and** a regression test |
 
@@ -102,7 +104,7 @@ macOS runner tools and do not require `rg`.
 
 1. Required test files exist (including `ContractRegressionTests.swift`).
 2. No XCTest / `example()` placeholders in the test target.
-3. `@Test` count ≥ `docs/test-baseline.json` → `min_test_count` (currently **56**).
+3. `@Test` count ≥ `docs/test-baseline.json` → `min_test_count` (currently **68**).
 4. Critical contract test symbols are present.
 
 **To lower the baseline**: only with explicit PR rationale tied to ARCHITECTURE / CONTRACT-TESTS. Prefer never lowering; delete dead tests carefully and keep count stable or rising.
@@ -128,13 +130,12 @@ README surfaces:
 - **Swift Testing** — static policy badge linking here
 - **SPM** / platform — static metadata badges
 
-`Scripts/coverage.sh` enforces an initial 67.00% first-party production line
-coverage ratchet. It includes the package's Swift sources and
+`Scripts/coverage.sh` enforces a 95.00% first-party production line coverage
+gate. The measured baseline is 715/747 lines (95.72%). It includes the package's Swift sources and
 `GeoMMDBBridge.c`, while excluding tests and vendored `libmaxminddb`. The
 generated summary is written to
 `ForgeRuleCore/.build/coverage/production-summary.md` and published in the CI
-job summary. Raising the threshold is preferred; lowering it requires explicit
-PR rationale.
+job summary. Lowering the threshold requires explicit PR rationale.
 
 ---
 
