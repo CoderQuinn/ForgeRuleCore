@@ -52,7 +52,7 @@ let package = Package(
         ),
         .testTarget(
             name: "ForgeRuleCoreTests",
-            dependencies: ["ForgeRuleCore"],
+            dependencies: ["ForgeRuleCore", "GeoMMDBBridge"],
             resources: [
                 .copy("Fixtures"),
             ]

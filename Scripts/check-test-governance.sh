@@ -15,6 +15,7 @@ die() { echo "governance FAIL: $*" >&2; exit 1; }
 [[ -f "$TESTS/RuleEngineAndMatchersTests.swift" ]] || die "missing RuleEngineAndMatchersTests.swift"
 [[ -f "$TESTS/MMDBReaderContractTests.swift" ]] || die "missing MMDBReaderContractTests.swift"
 [[ -f "$TESTS/ForgeRuleCoreBundleContractTests.swift" ]] || die "missing ForgeRuleCoreBundleContractTests.swift"
+[[ -f "$TESTS/SerializationAndBoundaryTests.swift" ]] || die "missing SerializationAndBoundaryTests.swift"
 [[ -f "$BASELINE" ]] || die "missing baseline: $BASELINE"
 
 # Forbid XCTest placeholders and mixed frameworks in this package.
