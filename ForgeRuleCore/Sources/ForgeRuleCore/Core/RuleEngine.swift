@@ -23,17 +23,7 @@ public final class RuleEngine: Sendable {
     }
 
     public func evaluate(_ input: RuleInput) -> RuleAction {
-        let input = RuleInput(
-            originalIP: input.originalIP,
-            resolvedIP: input.resolvedIP,
-            domain: input.domain.flatMap { dom in
-                let n = normalizeDomain(dom)
-                return n.isEmpty ? nil : n
-            },
-            port: input.port,
-            proto: input.proto,
-            factsResolved: input.factsResolved
-        )
+        let input = input.normalizedForEvaluation()
 
         var finalAction: RuleAction = .direct
 

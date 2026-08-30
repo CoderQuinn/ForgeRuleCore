@@ -109,12 +109,14 @@ private func expectBundleError(
     )
 
     let appGroup = "group.com.coderquinn.forge-rule-core.tests"
+    let revision = try #require(RuleRevision(rawValue: "bundle-rules-v1"))
     let core = try ForgeRuleCoreBundle.makeRuleCore(
         appGroup: appGroup,
         rules: [
             Rule(condition: .geosite("category-test"), action: .proxy("geosite")),
             Rule(condition: .geoip("us"), action: .proxy("geoip")),
         ],
+        revision: revision,
         containerURLResolver: { identifier in
             identifier == appGroup ? container : nil
         }
@@ -124,6 +126,7 @@ private func expectBundleError(
         core.route(bundleInput(domain: "www.example.test", ip: FBIPv4(a: 1, b: 1, c: 1, d: 1)))
             == .proxy("geosite")
     )
+    #expect(core.revision == revision)
     #expect(
         core.route(bundleInput(domain: "unlisted.test", ip: FBIPv4(a: 214, b: 78, c: 120, d: 1)))
             == .proxy("geoip")

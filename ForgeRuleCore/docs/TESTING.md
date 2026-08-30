@@ -37,6 +37,7 @@ ForgeRuleCore/Tests/ForgeRuleCoreTests/
   RuleEngineAndMatchersTests.swift   # matchers, GeoIP/GeoSite stubs, RuleEngine basics
   ContractRegressionTests.swift      # C-* contract locks (see CONTRACT-TESTS.md)
   SerializationAndBoundaryTests.swift # Codable, public API, and C bridge boundaries
+  RevisionAndFactsContractTests.swift # rule revision and DNS/flow fact provenance
 ```
 
 **Naming**
@@ -59,6 +60,7 @@ ForgeRuleCore/Tests/ForgeRuleCoreTests/
 | MMDB ABI / IPv4 byte order / reader lifecycle | `MMDBReaderContractTests` + `C-MMDB-*` |
 | App Group bundle layout / loader errors | `ForgeRuleCoreBundleContractTests` + `C-BUNDLE-*` |
 | Codable scalar values / public wrappers / null-safe C bridge | `SerializationAndBoundaryTests` |
+| Rule revision / DNS-flow fact provenance / detailed classification | `RevisionAndFactsContractTests` + `C-REVISION-*` / `C-DOMAIN-*` / `C-CLASSIFICATION-*` |
 | `normalizeDomain` / `normalizeGeoipKey` | helper unit tests |
 | New ARCHITECTURE §4 bullet | New `C-*` row in CONTRACT-TESTS.md **and** a regression test |
 
@@ -104,7 +106,7 @@ macOS runner tools and do not require `rg`.
 
 1. Required test files exist (including `ContractRegressionTests.swift`).
 2. No XCTest / `example()` placeholders in the test target.
-3. `@Test` count ≥ `docs/test-baseline.json` → `min_test_count` (currently **69**).
+3. `@Test` count ≥ `docs/test-baseline.json` → `min_test_count` (currently **76**).
 4. Critical contract test symbols are present.
 
 **To lower the baseline**: only with explicit PR rationale tied to ARCHITECTURE / CONTRACT-TESTS. Prefer never lowering; delete dead tests carefully and keep count stable or rising.
@@ -131,7 +133,7 @@ README surfaces:
 - **SPM** / platform — static metadata badges
 
 `Scripts/coverage.sh` enforces a 95.00% first-party production line coverage
-gate. The measured baseline is 715/747 lines (95.72%). It includes the package's Swift sources and
+gate. The measured baseline is 777/809 lines (96.04%). It includes the package's Swift sources and
 `GeoMMDBBridge.c`, while excluding tests and vendored `libmaxminddb`. The
 generated summary is written to
 `ForgeRuleCore/.build/coverage/production-summary.md` and published in the CI

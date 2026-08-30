@@ -1,9 +1,9 @@
 # ForgeRuleCore 契约测试与回归计划
 
 > **目的**：把 `ARCHITECTURE.md` 中的稳定契约落成可执行测试，防止语义漂移。  
-> **日期**：2026-07-22  
+> **日期**：2026-08-30
 > **范围**：单元测试 + 契约回归（含小型官方 MMDB fixture 与可注入 App Group bundle I/O）
-> **实现文件**：`ContractRegressionTests.swift`、`MMDBReaderContractTests.swift`、`ForgeRuleCoreBundleContractTests.swift`
+> **实现文件**：`ContractRegressionTests.swift`、`MMDBReaderContractTests.swift`、`ForgeRuleCoreBundleContractTests.swift`、`RevisionAndFactsContractTests.swift`
 
 ---
 
@@ -37,6 +37,9 @@
 | C-BUNDLE-ASSEMBLY | §8 | App Group 路径未真实装配 GeoSite 与 GeoIP |
 | C-BUNDLE-LAYOUT | §8 | 固定资源名或容器解析契约漂移 |
 | C-BUNDLE-ERRORS | §9 P2 | 缺文件与坏数据无法稳定分类，Extension 启动难排障 |
+| C-REVISION-IDENTITY | §4.2 | adapter 无法证明 decision 来自哪个不可变规则 snapshot |
+| C-DOMAIN-FACT-PROVENANCE | §4.2 | DNS domain/revision 在 flow resolve 时丢失或错绑到 FakeIP fact |
+| C-CLASSIFICATION-ENVELOPE | §4.2 | compatibility projection 只返回 decision，事实与 revision 不可观测 |
 
 ---
 
@@ -58,7 +61,7 @@
 ### 2.3 明确不在本 PR
 
 - 大型生产 `geoip.mmdb` / 官方 geosite 大文件
-- bundle 版本 manifest、checksum 与 atomic reload / rollback
+- bundle manifest/checksum 与 atomic reload / rollback provider
 - Compiler composite-condition 支持（当前 diagnostics 已覆盖 narrow compiler 的拒绝路径）
 
 ---
@@ -109,6 +112,16 @@
 ### C-PORT-PROTO-IGNORED
 
 同一域名规则；`port`/`proto` 不同不得改变 action。
+
+### C-REVISION-IDENTITY / C-DOMAIN-FACT-PROVENANCE / C-CLASSIFICATION-ENVELOPE
+
+- `RuleRevision` 只接受无首尾空白的非空 identity，并以单个 JSON string round-trip。
+- DNS 提供的 domain 经 `FlowFactsResolver` 规范化后仍保留 `.dns` 来源与原
+  `domainRevision`。
+- 空白 DNS domain 若回退到 FakeIP，来源改为 `.fakeIP` 且旧 revision 清空。
+- `RuleCore.classify` 返回 decision、当前 snapshot revision 与实际评估的规范化 input。
+- `FlowRuleClassifier.classifyWithFacts` 跨 DNS → flow 保留 domain fact revision，同时区分
+  当前 flow snapshot revision；旧 `classify` 必须是同一 detailed result 的 decision 投影。
 
 ### C-COMPILER-DIAGNOSTICS
 

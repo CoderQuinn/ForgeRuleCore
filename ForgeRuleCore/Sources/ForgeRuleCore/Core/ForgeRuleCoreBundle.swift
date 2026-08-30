@@ -52,11 +52,13 @@ public enum ForgeRuleCoreBundle {
 
     public static func makeRuleCore(
         appGroup: String,
-        rules: [Rule]
+        rules: [Rule],
+        revision: RuleRevision? = nil
     ) throws -> RuleCore {
         try makeRuleCore(
             appGroup: appGroup,
             rules: rules,
+            revision: revision,
             containerURLResolver: { identifier in
                 FileManager.default.containerURL(
                     forSecurityApplicationGroupIdentifier: identifier
@@ -68,6 +70,7 @@ public enum ForgeRuleCoreBundle {
     static func makeRuleCore(
         appGroup: String,
         rules: [Rule],
+        revision: RuleRevision? = nil,
         containerURLResolver: (String) -> URL?
     ) throws -> RuleCore {
         let normalizedAppGroup = appGroup.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -78,12 +81,17 @@ public enum ForgeRuleCoreBundle {
         }
 
         let rulesDirectory = base.appendingPathComponent(rulesSubdirectory, isDirectory: true)
-        return try makeRuleCore(resourceDirectory: rulesDirectory, rules: rules)
+        return try makeRuleCore(
+            resourceDirectory: rulesDirectory,
+            rules: rules,
+            revision: revision
+        )
     }
 
     static func makeRuleCore(
         resourceDirectory: URL,
         rules: [Rule],
+        revision: RuleRevision? = nil,
         fileManager: FileManager = .default
     ) throws -> RuleCore {
         let geositeURL = resourceDirectory.appendingPathComponent(
@@ -129,7 +137,7 @@ public enum ForgeRuleCoreBundle {
 
         let engine = RuleEngine(rules: rules, geosite: geosite, geoip: geoip)
 
-        return RuleCore(engine: engine)
+        return RuleCore(engine: engine, revision: revision)
     }
 
     private static func requireFile(
@@ -151,9 +159,14 @@ public enum ForgeRuleCoreBundle {
     public static func makeFlowClassifier(
         appGroup: String,
         rules: [Rule],
+        revision: RuleRevision? = nil,
         fakeIPStore: FakeIPStore? = nil
     ) throws -> FlowRuleClassifier {
-        let core = try makeRuleCore(appGroup: appGroup, rules: rules)
+        let core = try makeRuleCore(
+            appGroup: appGroup,
+            rules: rules,
+            revision: revision
+        )
         let resolver = FlowFactsResolver(fakeIPStore: fakeIPStore)
         return FlowRuleClassifier(resolver: resolver, core: core)
     }
