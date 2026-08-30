@@ -3,7 +3,7 @@
 > **目的**：把 `ARCHITECTURE.md` 中的稳定契约落成可执行测试，防止语义漂移。  
 > **日期**：2026-08-30
 > **范围**：单元测试 + 契约回归（含小型官方 MMDB fixture 与可注入 App Group bundle I/O）
-> **实现文件**：`ContractRegressionTests.swift`、`MMDBReaderContractTests.swift`、`ForgeRuleCoreBundleContractTests.swift`、`RevisionAndFactsContractTests.swift`
+> **实现文件**：`ContractRegressionTests.swift`、`MMDBReaderContractTests.swift`、`ForgeRuleCoreBundleContractTests.swift`、`RevisionAndFactsContractTests.swift`、`RuleCoreProviderContractTests.swift`
 
 ---
 
@@ -40,6 +40,9 @@
 | C-REVISION-IDENTITY | §4.2 | adapter 无法证明 decision 来自哪个不可变规则 snapshot |
 | C-DOMAIN-FACT-PROVENANCE | §4.2 | DNS domain/revision 在 flow resolve 时丢失或错绑到 FakeIP fact |
 | C-CLASSIFICATION-ENVELOPE | §4.2 | compatibility projection 只返回 decision，事实与 revision 不可观测 |
+| C-ATOMIC-SNAPSHOT | §4.2 | classify 可能观察到新旧 snapshot 混合出的 revision 与 decision |
+| C-RELOAD-VALIDATION | §5.2 | 未验证或重复 revision 被激活；慢校验阻塞读路径 |
+| C-ROLLBACK-LKG | §5.2 | 失败更新覆盖最后可用版本，或 rollback 失败后状态被破坏 |
 
 ---
 
@@ -58,10 +61,10 @@
 
 每个用例对应一条 **不得无文档变更的行为**。失败即视为契约破坏，须先改 ARCHITECTURE 再改测试。
 
-### 2.3 明确不在本 PR
+### 2.3 明确不在当前契约范围
 
 - 大型生产 `geoip.mmdb` / 官方 geosite 大文件
-- bundle manifest/checksum 与 atomic reload / rollback provider
+- bundle manifest/checksum 的生成、下载与持久化
 - Compiler composite-condition 支持（当前 diagnostics 已覆盖 narrow compiler 的拒绝路径）
 
 ---
@@ -122,6 +125,16 @@
 - `RuleCore.classify` 返回 decision、当前 snapshot revision 与实际评估的规范化 input。
 - `FlowRuleClassifier.classifyWithFacts` 跨 DNS → flow 保留 domain fact revision，同时区分
   当前 flow snapshot revision；旧 `classify` 必须是同一 detailed result 的 decision 投影。
+
+### C-ATOMIC-SNAPSHOT / C-RELOAD-VALIDATION / C-ROLLBACK-LKG
+
+- `RuleCoreSnapshot` 拒绝没有显式 `RuleRevision` 的 core。
+- classify 只捕获一个完整 immutable snapshot；并发 reload 前后的结果只能是
+  `(旧 revision, 旧 decision)` 或 `(新 revision, 新 decision)`，不得撕裂。
+- candidate 只有在 validator 接受后才成为 active；重复 active revision 与 validator 拒绝均返回稳定错误，且 active / previous 状态不变。
+- validator 运行时不持有 classify 读锁；慢校验期间旧 active snapshot 仍可服务请求。
+- 成功 reload 只保留一个上次接受的 snapshot 作为 LKG。rollback 须再次通过 validator；成功后恢复 LKG 并丢弃失败 active，不把失败版本保留为下一次 rollback candidate。
+- 无 LKG 或 rollback validator 拒绝时返回稳定错误，且 provider 状态不变。
 
 ### C-COMPILER-DIAGNOSTICS
 
