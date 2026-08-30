@@ -3,8 +3,8 @@
 > **角色**：不可变快照式 **routing / geo rule kernel** — `RuleEngine.evaluate` → Direct / Proxy / Reject  
 > **QuantumLink 中的位置**：L3 策略 — TCP accept + dial 决策 **之后**  
 > **当前兼容级别**：Xray / Surge 风格规则的 **narrow 子集**，不承诺完整兼容  
-> **成熟度**：MVP kernel（核心匹配可用）；生产接入前须处理 MMDB 生命周期与 compiler 诊断  
-> **最后更新**：2026-07-19  
+> **成熟度**：MVP kernel（核心匹配可用）；生产接入仍须由 host 完成 atomic reload / rollback
+> **最后更新**：2026-08-30
 > **审查依据**：[技术文案.md](./技术文案.md)
 
 ---
@@ -28,7 +28,7 @@
 ```
                     ┌─────────────────────────────────────┐
   raw flow          │         FlowRuleClassifier          │
-  RuleInput ───────►│  resolve facts  →  RuleCore.route   │───► RouteDecision
+  RuleInput ───────►│ resolve facts → RuleCore.classify   │───► RuleClassification
   (factsResolved=false)        │              │           │
                     └──────────┼──────────────┼───────────┘
                                ▼              ▼
@@ -87,7 +87,8 @@ libmaxminddb (C)
 | API | 说明 |
 |-----|------|
 | `Rule` / `RuleCondition` / `RuleAction` | 规则原语 |
-| `RuleInput` | 评估输入 |
+| `RuleInput` / `RuleDomainFactSource` | 评估输入与 domain fact 来源 |
+| `RuleRevision` / `RuleClassification` | 不透明 snapshot identity 与详细分类结果 |
 | `RuleEngine` / `RuleCore` | 评估与路由 |
 | `FlowRuleClassifier` / `FlowFactsResolving` / `FakeIPStore` | Flow 适配 |
 | `GeoSiteDB` / `GeoIPDB` / `CountryLookup` | Geo 依赖与注入点 |
@@ -109,6 +110,8 @@ public final class RuleEngine: Sendable {
 | 字段 | 引擎是否消费 | 说明 |
 |------|--------------|------|
 | `domain` | ✅ | 规范化后参与域名 / geosite 匹配 |
+| `domainSource` | ❌ | domain 来自 flow context、DNS 或 FakeIP |
+| `domainRevision` | ❌ | 产生 domain fact 的规则 revision；跨阶段原样保留 |
 | `resolvedIP` | ✅ | 仅用于 `.geoip` |
 | `originalIP` | ❌ | 保留给上层 / FakeIP 上下文 |
 | `port` | ❌ | **reserved**；组合条件未接线 |
@@ -127,7 +130,14 @@ public final class RuleEngine: Sendable {
 6. **默认动作**：无任何命中（且无 `.any` 写入）时返回 `.direct`。
 7. **域名类条件**在 `domain == nil` 时不命中。
 8. **`.geoip` 仅看 `resolvedIP`**，不看 `originalIP`。
-9. **`FlowRuleClassifier`**：先 `FlowFactsResolving.resolve`，再 `RuleCore.route`。
+9. **`FlowRuleClassifier`**：先 `FlowFactsResolving.resolve`，再 `RuleCore.classify`。旧
+   `classify(_:)` 仍返回 `RouteDecision`；`classifyWithFacts(_:)` 同时返回实际评估的
+   `RuleInput` 与当前 `RuleRevision`。
+10. **事实来源保留**：显式 domain 在 resolve 时保留 `.dns` 等来源和
+    `domainRevision`；FakeIP fallback 必须替换来源为 `.fakeIP` 并清除旧 revision，不能把
+    空白 DNS fact 的 revision 错绑到新域名。
+11. **Revision 不推断**：`RuleRevision` 是 host 提供的不透明、非空 identity；未提供时
+    classification 明确返回 `nil`，内核不会用路径、时间或 `latest` 猜测版本。
 
 ### 4.3 Geo 匹配语义
 
@@ -238,6 +248,7 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 `ForgeRuleCoreTests`（Swift Testing）覆盖 narrow contract：
 
 - FlowFactsResolver（含 FakeIP / 空白域名）
+- DNS/flow domain fact provenance、rule revision 与 detailed classification envelope
 - Field routing / DNS JSON 解码与 primitive lowering
 - Domain matchers、GeoSite temp JSON、GeoIP stub
 - `RuleEngine` 顺序、`.any` fallback、域名规范化
@@ -259,7 +270,7 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 | 阶段 | 工作 | 状态 |
 |------|------|------|
 | Phase 2 | Extension 链接 ForgeRuleCore SPM | 规划 |
-| Phase 2 | App Group 加载 geosite / geoip | 固定 layout、真实 I/O 与错误分类已覆盖；版本/reload 待 host |
+| Phase 2 | App Group 加载 geosite / geoip | 固定 layout、真实 I/O、错误分类与 host-supplied revision 已覆盖；reload 待 host |
 | Phase 2 | NetForge `TrafficPolicyProvider` → `evaluate` | 规划 |
 | Phase 2 | 热更新：snapshot swap + provider message | 规划；reader handle 已支持并存 |
 
@@ -292,6 +303,7 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 - [ ] `RuleCoreSnapshot` / `RuleCoreProvider`：atomic swap（rules + GeoSite + GeoIP）
 - [ ] 线程安全：classify 可并发；reload 不长时间阻塞读路径
 - [x] `ForgeRuleCoreBundle`：可注入 App Group resolver、文件存在性与稳定错误细分
+- [x] `RuleClassification`：保留 snapshot revision 与 DNS/flow domain fact provenance
 - [ ] Bundle manifest：版本、checksum、兼容性与 rollback 信息
 - [ ] NetForge `PolicyDecision` / QuantumLink provider message 类型映射
 
@@ -325,6 +337,7 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 | 2026-06-27 | 明确 narrow compiler 契约与架构 TODO |
 | 2026-07-19 | 吸收代码审查：数据流、stable API、Geo/`!cc`/MMDB 硬约束、TODO 重排 |
 | 2026-08-29 | compiler diagnostics；GeoMMDB per-reader handle 与真实 fixture contract |
+| 2026-08-30 | RuleRevision、domain fact provenance 与详细 classification envelope |
 
 ---
 

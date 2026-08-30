@@ -25,6 +25,7 @@ ForgeRuleCore 是供路由与 DNS 共用的 Swift 规则内核，包含 `RuleCor
 - **DNS：** 通过 `DNSRoutingConfigJSON` 解码 `hosts` 与字符串/对象混合的 `servers`。DoH、`expectIPs` 校验和 `skipFallback` 编排属于上层 DNS 服务，不在本 package 内实现。
 - **GeoMMDB：** 每个 `MMDBReader` 独立拥有一个不可变 database handle。reload 应创建新的完整规则 snapshot 后替换，不再提供原地 `reopen`。固定版本的 MaxMind 官方测试库覆盖 IPv4 字节序、不同数据库并存、打开失败隔离与 teardown。
 - **Bundle 装配：** App Group container 必须包含 `Rules/geosite.json` 与 `Rules/geoip.mmdb` 文件，与 QuantumLink 路径契约一致。`ForgeRuleCoreBundleError` 可区分容器无法解析、资源缺失、geosite 数据损坏与 MMDB 打开失败；资源版本和原子 snapshot 替换仍由 host 负责。
+- **分类身份：** 装配 `RuleCore` 时以 `RuleRevision` 传入不可变 manifest 或 bundle identity。`RuleClassification` 同时返回该 snapshot revision 与实际评估的规范化输入；DNS domain fact 经 `FlowFactsResolver` 后保留来源 revision，而 FakeIP fallback 会清除过期 DNS provenance。
 
 ## 文档
 
@@ -42,7 +43,7 @@ ForgeRuleCore 是供路由与 DNS 共用的 Swift 规则内核，包含 `RuleCor
 ./Scripts/coverage.sh
 ```
 
-`./Scripts/ci.sh` 是本地与 GitHub Actions 共用的唯一完整门禁：执行 69 项测试治理下限、Debug/Release 测试、将严格 Swift 并发诊断视为错误、通用 iOS 15 arm64 构建，以及首方生产代码覆盖率。覆盖率门槛为 95.00%（当前基线为 715/747 行，即 95.72%）；测试与 vendored `libmaxminddb` 不计入，但 package 自身 Swift 源码与 `GeoMMDBBridge.c` 均在范围内。依赖锁定到已审查的 ForgeBase 0.3.0，以获得 Swift 6 `Sendable` packet 契约。
+`./Scripts/ci.sh` 是本地与 GitHub Actions 共用的唯一完整门禁：执行 76 项测试治理下限、Debug/Release 测试、将严格 Swift 并发诊断视为错误、通用 iOS 15 arm64 构建，以及首方生产代码覆盖率。覆盖率门槛为 95.00%（当前基线为 777/809 行，即 96.04%）；测试与 vendored `libmaxminddb` 不计入，但 package 自身 Swift 源码与 `GeoMMDBBridge.c` 均在范围内。依赖锁定到已审查的 ForgeBase 0.3.0，以获得 Swift 6 `Sendable` packet 契约。
 
 ## TODO
 

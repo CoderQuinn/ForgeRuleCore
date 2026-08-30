@@ -29,6 +29,8 @@ public final class FlowFactsResolver: FlowFactsResolving {
                 originalIP: input.originalIP,
                 resolvedIP: input.resolvedIP,
                 domain: d0,
+                domainSource: input.domainSource ?? .flowContext,
+                domainRevision: input.domainRevision,
                 port: input.port,
                 proto: input.proto,
                 factsResolved: true
@@ -42,6 +44,8 @@ public final class FlowFactsResolver: FlowFactsResolving {
             originalIP: input.originalIP,
             resolvedIP: input.resolvedIP,
             domain: eff,
+            domainSource: eff == nil ? nil : .fakeIP,
+            domainRevision: nil,
             port: input.port,
             proto: input.proto,
             factsResolved: true

@@ -25,6 +25,7 @@ Swift package: shared **rule kernel** for routing and DNS (`RuleCore`, `GeoSiteD
 - **DNS:** decode `DNSRoutingConfigJSON` for `hosts` and mixed `servers` (string or object). DoH, `expectIPs` validation, and `skipFallback` orchestration belong in your DNS service, not in this package.
 - **GeoMMDB:** every `MMDBReader` owns an independent immutable database handle. Create a replacement rule snapshot to reload; there is no in-place `reopen`. Official pinned MaxMind test fixtures cover IPv4 byte order, independent databases, open failure isolation, and teardown.
 - **Bundle assembly:** the App Group container must contain `Rules/geosite.json` and `Rules/geoip.mmdb` as files, matching the QuantumLink path contract. `ForgeRuleCoreBundleError` distinguishes an unresolved container, a missing resource, malformed geosite data, and MMDB open failure. Resource versioning and atomic snapshot replacement remain host responsibilities.
+- **Classification identity:** pass the immutable manifest or bundle identity as `RuleRevision` when assembling `RuleCore`. `RuleClassification` returns that snapshot revision together with the normalized evaluated input; DNS-originated domain facts retain their source revision across `FlowFactsResolver`, while FakeIP fallback clears stale DNS provenance.
 
 ## Docs
 
@@ -43,10 +44,10 @@ Swift package: shared **rule kernel** for routing and DNS (`RuleCore`, `GeoSiteD
 ```
 
 `./Scripts/ci.sh` is the canonical local and GitHub Actions gate. It runs the
-69-test governance floor, clean Debug and Release builds/tests, strict Swift
+76-test governance floor, clean Debug and Release builds/tests, strict Swift
 concurrency diagnostics as errors, a generic iOS 15 arm64 build, and
 first-party production coverage. The coverage gate is 95.00% (current baseline:
-715/747 lines, 95.72%); vendored `libmaxminddb` and tests are excluded, while
+777/809 lines, 96.04%); vendored `libmaxminddb` and tests are excluded, while
 the package's own Swift sources and `GeoMMDBBridge.c` remain in scope. The
 resolved ForgeBase baseline is 0.3.0, which supplies the reviewed Swift 6
 `Sendable` packet contracts.
