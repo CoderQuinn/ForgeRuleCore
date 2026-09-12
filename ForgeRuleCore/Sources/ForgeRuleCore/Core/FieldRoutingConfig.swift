@@ -31,12 +31,63 @@ public struct FieldRuleJSON: Codable, Sendable {
     public var domain: [String]?
     public var ip: [String]?
     public var network: String?
+
+    /// Unknown constraint names survive decoding so compilation cannot silently
+    /// broaden a rule. Their values are deliberately not retained or logged.
+    public private(set) var unsupportedKeys: [String] = []
+
+    public init(type: String? = nil, outboundTag: String? = nil, domain: [String]? = nil, ip: [String]? = nil, network: String? = nil) {
+        self.type = type
+        self.outboundTag = outboundTag
+        self.domain = domain
+        self.ip = ip
+        self.network = network
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case type, outboundTag, domain, ip, network
+    }
+
+    private struct RawKey: CodingKey {
+        let stringValue: String
+        var intValue: Int? { nil }
+        init(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { return nil }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.container(keyedBy: RawKey.self)
+        let known = Set(CodingKeys.allCases.map(\.rawValue))
+        unsupportedKeys = raw.allKeys.map(\.stringValue).filter { !known.contains($0) }.sorted()
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        type = try values.decodeIfPresent(String.self, forKey: .type)
+        outboundTag = try values.decodeIfPresent(String.self, forKey: .outboundTag)
+        domain = try values.decodeIfPresent([String].self, forKey: .domain)
+        ip = try values.decodeIfPresent([String].self, forKey: .ip)
+        network = try values.decodeIfPresent(String.self, forKey: .network)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        guard unsupportedKeys.isEmpty else {
+            throw EncodingError.invalidValue(self, .init(
+                codingPath: encoder.codingPath,
+                debugDescription: "Cannot encode a field rule with unsupported constraints"
+            ))
+        }
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encodeIfPresent(type, forKey: .type)
+        try values.encodeIfPresent(outboundTag, forKey: .outboundTag)
+        try values.encodeIfPresent(domain, forKey: .domain)
+        try values.encodeIfPresent(ip, forKey: .ip)
+        try values.encodeIfPresent(network, forKey: .network)
+    }
 }
 
 // MARK: - Compilation
 
 /// Stable reason codes for field rows that cannot be lowered without changing their meaning.
 public enum FieldRoutingDiagnosticReason: String, Error, Sendable, Equatable {
+    case unsupportedField = "unsupported_field"
     case unsupportedRuleType = "unsupported_rule_type"
     case missingOutboundTag = "missing_outbound_tag"
     case unsupportedNetwork = "unsupported_network"
@@ -69,9 +120,24 @@ public struct FieldRoutingCompilation: Sendable, Equatable {
     public var isSuccessful: Bool { diagnostics.isEmpty }
 }
 
+/// All rejected row indexes, without any partially accepted rules to activate.
+public struct FieldRoutingValidationError: Error, Sendable, Equatable {
+    public let diagnostics: [FieldRoutingDiagnostic]
+}
+
 // MARK: - Factory
 
 public enum FieldRoutingRuleFactory {
+    /// All-or-nothing lowering for new integrations. This validates decoded rows,
+    /// not raw JSON duplicate keys, resource limits, or complete Xray semantics.
+    public static func compileValidated(fields: [FieldRuleJSON]) throws -> [Rule] {
+        let result = compile(fields: fields)
+        guard result.isSuccessful else {
+            throw FieldRoutingValidationError(diagnostics: result.diagnostics)
+        }
+        return result.rules
+    }
+
     /// Compiles Xray-style field rules while preserving accepted order and rejected row indexes.
     public static func compile(fields: [FieldRuleJSON]) -> FieldRoutingCompilation {
         var rules: [Rule] = []
@@ -90,7 +156,7 @@ public enum FieldRoutingRuleFactory {
     }
 
     /// Compatibility projection that returns only accepted rules (order preserved).
-    /// New integrations should use `compile(fields:)` and require `isSuccessful`.
+    /// New integrations should use `compileValidated(fields:)`.
     public static func makeRules(from fields: [FieldRuleJSON]) -> [Rule] {
         compile(fields: fields).rules
     }
@@ -104,6 +170,7 @@ public enum FieldRoutingRuleFactory {
     private static func compileRule(
         from field: FieldRuleJSON
     ) -> Result<Rule, FieldRoutingDiagnosticReason> {
+        guard field.unsupportedKeys.isEmpty else { return .failure(.unsupportedField) }
         let type = field.type ?? "field"
         guard type == "field" else { return .failure(.unsupportedRuleType) }
         guard let action = mapOutboundTag(field.outboundTag) else {
@@ -184,7 +251,7 @@ public enum FieldRoutingRuleFactory {
         if s.hasPrefix("geoip:") {
             let k = String(s.dropFirst("geoip:".count))
             let n = normalizeGeoipKey(k)
-            return n.isEmpty ? .failure(.invalidIPEntry) : .success(.geoip(n))
+            return GeoIPDB.isValidKey(n) ? .success(.geoip(n)) : .failure(.invalidIPEntry)
         }
         return .failure(.unsupportedIPEntry)
     }

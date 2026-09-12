@@ -4,7 +4,7 @@
 > **QuantumLink 中的位置**：L3 策略 — TCP accept + dial 决策 **之后**  
 > **当前兼容级别**：Xray / Surge 风格规则的 **narrow 子集**，不承诺完整兼容  
 > **成熟度**：MVP kernel（核心匹配与 snapshot lifecycle 可用）；生产接入仍须由 host 提供版本、持久化与触发编排
-> **最后更新**：2026-08-30
+> **最后更新**：2026-09-13
 > **审查依据**：[技术文案.md](./技术文案.md)
 
 ---
@@ -159,11 +159,13 @@ public final class RuleEngine: Sendable {
 |-----|------|
 | `cc` / `cn` | 国家码相等则命中；lookup miss → **不命中** |
 | `!cc` / `!cn` | 对正匹配取反；lookup miss 时正匹配为 false，故 **`!cc` 命中** |
-| 空 / 非法码 | 不命中 |
+| 空 / 非法码（含 `!bogus`、`!!cn`、`!12`） | 取反之前拒绝，始终不命中 |
 
 > **契约（写死）**：`geoip:!cn` 表示「不是明确的 CN」，包含「查不到国家」的 IP（私网、缺失库、未知段）。若业务需要「明确非 CN」，须在上层先过滤 lookup miss。
 
 Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
+编译器与 DB 共用 key 语法校验：规范化后的两位 ASCII 字母，可有单个 `!`；
+不引入 ISO 国家存在性查询，合法 `!cc` 的 lookup miss 语义保持不变。
 
 ### 4.4 条件支持矩阵
 
@@ -185,6 +187,8 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 - 每个 `type: field` row 最多产出 **一条** primitive `Rule`。
 - 接受：单个 domain entry **或** 单个 `geoip:` entry。
 - `compile(fields:)` 返回保序的 accepted `rules` 与每个 rejected row 的 `fieldIndex` + 稳定 `reason`；只要存在 rejected row，`isSuccessful == false`。
+- `compileValidated(fields:)` 为新增的全有或全无入口：成功返回全部规则，失败抛出仅含完整 diagnostics 的 `FieldRoutingValidationError`，不返回可误激活的部分规则。
+- `FieldRuleJSON` 解码保留未知键名至只读 `unsupportedKeys`（不保存未知值）；未知字段即使值为 null 也拒绝，不能悄悄扩大条件。带未知字段的 DTO 重新编码会抛错，防止重编码后丢失限制。
 - 拒绝：多个 domain、`domain + ip`、任意非空 `network`、`regexp:`、非法 / 空 `outboundTag`、非 `field` type。
 - 验证以原始数组计数为准，不得先丢非法 entry 再把剩余 entry 当作有效 row。
 - `outboundTag`：`direct` → `.direct`；`reject` / `block` → `.reject`；其他非空 → `.proxy(tag)`。
@@ -192,16 +196,19 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 
 | Diagnostic reason | 拒绝条件 |
 |-------------------|----------|
+| `unsupported_field` | row 存在未知键；优先于其他诊断 |
 | `unsupported_rule_type` | `type` 不是 `field` |
 | `missing_outbound_tag` | `outboundTag` 缺失或为空 |
 | `unsupported_network` | `network` 非空 |
 | `mixed_domain_and_ip` | 同一 row 同时包含 domain 与 ip |
 | `multiple_domain_entries` / `multiple_ip_entries` | 同类 entry 超过一条 |
 | `missing_condition` | domain 与 ip 都没有 entry |
-| `invalid_domain_entry` / `invalid_ip_entry` | entry 为空或前缀 payload 为空 |
+| `invalid_domain_entry` / `invalid_ip_entry` | entry 为空、前缀 payload 为空或 GeoIP key 语法非法 |
 | `unsupported_domain_entry` / `unsupported_ip_entry` | 非当前 narrow subset 的表达式 |
 
-`makeRule(from:)` / `makeRules(from:)` 仅为兼容旧调用方的 accepted-rules 投影，不携带 diagnostics。新集成必须调用 `compile(fields:)` 并在安装规则前要求 `isSuccessful`。
+`makeRule(from:)` / `makeRules(from:)` 仅为兼容旧调用方的 accepted-rules 投影，不携带 diagnostics。新集成使用 `compileValidated(fields:)`；需要 lint 部分结果时可用 `compile(fields:)`，但必须检查 `isSuccessful` 后才可安装。
+
+这不是完整 raw JSON 严格解析器：重复键、输入大小/深度限制、routing 外层未知字段、GeoSite 严格 schema 和完整 Surge/sing-box/Xray adapter 仍待实现。当前 `.any`/默认 Direct 与合法规则语义不变，不强加新的唯一末尾 FINAL 约束。
 
 ---
 

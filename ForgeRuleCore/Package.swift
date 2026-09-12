@@ -52,9 +52,12 @@ let package = Package(
         ),
         .testTarget(
             name: "ForgeRuleCoreTests",
-            dependencies: ["ForgeRuleCore", "GeoMMDBBridge"],
+            dependencies: ["ForgeRuleCore", "GeoMMDBBridge", "libmaxminddb"],
             resources: [
                 .copy("Fixtures"),
+            ],
+            cSettings: [
+                .define("MMDB_UINT128_IS_BYTE_ARRAY"),
             ]
         ),
     ]

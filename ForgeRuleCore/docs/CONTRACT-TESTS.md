@@ -1,7 +1,7 @@
 # ForgeRuleCore 契约测试与回归计划
 
 > **目的**：把 `ARCHITECTURE.md` 中的稳定契约落成可执行测试，防止语义漂移。  
-> **日期**：2026-08-30
+> **日期**：2026-09-13
 > **范围**：单元测试 + 契约回归（含小型官方 MMDB fixture 与可注入 App Group bundle I/O）
 > **实现文件**：`ContractRegressionTests.swift`、`MMDBReaderContractTests.swift`、`ForgeRuleCoreBundleContractTests.swift`、`RevisionAndFactsContractTests.swift`、`RuleCoreProviderContractTests.swift`
 
@@ -28,6 +28,9 @@
 | C-EVAL-NORMALIZE | §4.2 #2 | 依赖调用方先 normalize |
 | C-PORT-PROTO-IGNORED | §4.1 reserved | 误以为已支持端口/协议分流 |
 | C-COMPILER-DIAGNOSTICS | §4.5 | 拒绝原因或源 row 下标丢失，部分规则被误报为成功 |
+| C-FIELD-UNKNOWN | §4.5 | 未知限制键被解码/重编码丢弃导致放宽规则 |
+| C-FIELD-ATOMIC | §4.5 | 新接入方误激活部分编译结果 |
+| C-GEOIP-INVALID | §4.3 | 非法国家码正条件为 false，被否定后误命中 |
 | C-OUTBOUND-MAP | §4.5 | tag 映射漂移 |
 | C-GEOSITE-REGEX | §4.3 | 误以为 regex 生效 |
 | C-FIRST-WINS | §4.2 #4 | 多规则命中顺序错误 |
@@ -70,6 +73,19 @@
 ---
 
 ## 3. 用例明细
+
+### 输入安全增量（`FieldInputSafetyTests.swift`）
+
+- C-FIELD-UNKNOWN：port/source/protocol/inboundTag/未来键（包括 null）均保留键名并拒绝；未知值不保留，DTO 修改已知属性后仍不能通过重编码洗掉未知约束。已知字段正常往返，类型错误继续抛出 DecodingError。
+- C-FIELD-ATOMIC：有效/无效 row 混合时新入口抛出所有拒绝下标，无部分规则返回；全部有效保持顺序，空数组保持兼容。
+- C-GEOIP-INVALID：非法 `!bogus`/`!!cn`/数字/空值在 compiler 拒绝，在有/无 lookup、冷/预热 cache 下均不命中。
+- C-GEOIP-MISS：合法 `cn`/`!cn`、大小写/空白兼容与 `xx` 语法不变；未知国家查询仍保持原先正条件不命中、否定条件命中。
+
+### MMDB 数值字节序（`MMDBNumericDecodingTests.swift`）
+
+- C-MMDB-BYTE-ORDER：构造网络字节序的 float/double `1.5`，通过链接的 `MMDB_aget_value` 验证类型和值，避免只测 Swift 侧转换。
+- SwiftPM 的 `maxminddb_config.h` 根据编译目标宏设置字节序；不依赖构建主机，也不将未知架构默认当成大端。
+- 测试 target 与 C 实现使用相同的 `MMDB_UINT128_IS_BYTE_ARRAY` 定义，保持结构体 ABI 一致。
 
 ### C-GEOIP-MISS — `geoip:!cc` 在 lookup miss 时命中
 
