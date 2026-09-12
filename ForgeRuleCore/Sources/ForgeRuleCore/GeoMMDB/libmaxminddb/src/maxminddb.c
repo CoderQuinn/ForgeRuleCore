@@ -1404,7 +1404,7 @@ static int decode_one(const MMDB_s *const mmdb,
     // could overflow for a corrupt database while an underflow
     // from data_section_size - 1 should not be possible.
     if (offset > mmdb->data_section_size - 1) {
-        DEBUG_MSGF("Offset (%d) past data section (%d)",
+        DEBUG_MSGF("Offset (%" PRIu32 ") past data section (%" PRIu32 ")",
                    offset,
                    mmdb->data_section_size);
         return MMDB_INVALID_DATA_ERROR;
@@ -1414,7 +1414,7 @@ static int decode_one(const MMDB_s *const mmdb,
     entry_data->has_data = true;
 
     DEBUG_NL;
-    DEBUG_MSGF("Offset: %i", offset);
+    DEBUG_MSGF("Offset: %" PRIu32, offset);
 
     uint8_t ctrl = mem[offset++];
     DEBUG_BINARY("Control byte: %s", ctrl);
@@ -1425,7 +1425,7 @@ static int decode_one(const MMDB_s *const mmdb,
     if (type == MMDB_DATA_TYPE_EXTENDED) {
         // Subtracting 1 to avoid possible overflow on offset + 1
         if (offset > mmdb->data_section_size - 1) {
-            DEBUG_MSGF("Extended type offset (%d) past data section (%d)",
+            DEBUG_MSGF("Extended type offset (%" PRIu32 ") past data section (%" PRIu32 ")",
                        offset,
                        mmdb->data_section_size);
             return MMDB_INVALID_DATA_ERROR;
@@ -1444,13 +1444,13 @@ static int decode_one(const MMDB_s *const mmdb,
         // database and that the subtraction of psize did not underflow.
         if (offset > mmdb->data_section_size - psize ||
             mmdb->data_section_size < psize) {
-            DEBUG_MSGF("Pointer offset (%d) past data section (%d)",
+            DEBUG_MSGF("Pointer offset (%" PRIu32 ") past data section (%" PRIu32 ")",
                        offset + psize,
                        mmdb->data_section_size);
             return MMDB_INVALID_DATA_ERROR;
         }
         entry_data->pointer = get_ptr_from(ctrl, &mem[offset], psize);
-        DEBUG_MSGF("Pointer to: %i", entry_data->pointer);
+        DEBUG_MSGF("Pointer to: %" PRIu32, entry_data->pointer);
 
         entry_data->data_size = psize;
         entry_data->offset_to_next = offset + psize;
@@ -1462,7 +1462,7 @@ static int decode_one(const MMDB_s *const mmdb,
         case 29:
             // We subtract when checking offset to avoid possible overflow
             if (offset > mmdb->data_section_size - 1) {
-                DEBUG_MSGF("String end (%d, case 29) past data section (%d)",
+                DEBUG_MSGF("String end (%" PRIu32 ", case 29) past data section (%" PRIu32 ")",
                            offset,
                            mmdb->data_section_size);
                 return MMDB_INVALID_DATA_ERROR;
@@ -1472,7 +1472,7 @@ static int decode_one(const MMDB_s *const mmdb,
         case 30:
             // We subtract when checking offset to avoid possible overflow
             if (offset > mmdb->data_section_size - 2) {
-                DEBUG_MSGF("String end (%d, case 30) past data section (%d)",
+                DEBUG_MSGF("String end (%" PRIu32 ", case 30) past data section (%" PRIu32 ")",
                            offset,
                            mmdb->data_section_size);
                 return MMDB_INVALID_DATA_ERROR;
@@ -1483,7 +1483,7 @@ static int decode_one(const MMDB_s *const mmdb,
         case 31:
             // We subtract when checking offset to avoid possible overflow
             if (offset > mmdb->data_section_size - 3) {
-                DEBUG_MSGF("String end (%d, case 31) past data section (%d)",
+                DEBUG_MSGF("String end (%" PRIu32 ", case 31) past data section (%" PRIu32 ")",
                            offset,
                            mmdb->data_section_size);
                 return MMDB_INVALID_DATA_ERROR;
@@ -1495,7 +1495,7 @@ static int decode_one(const MMDB_s *const mmdb,
             break;
     }
 
-    DEBUG_MSGF("Size: %i", size);
+    DEBUG_MSGF("Size: %" PRIu32, size);
 
     if (type == MMDB_DATA_TYPE_MAP || type == MMDB_DATA_TYPE_ARRAY) {
         entry_data->data_size = size;
@@ -1515,7 +1515,7 @@ static int decode_one(const MMDB_s *const mmdb,
     // buffer and that the calculation in doing this did not underflow.
     if (offset > mmdb->data_section_size - size ||
         mmdb->data_section_size < size) {
-        DEBUG_MSGF("Data end (%d) past data section (%d)",
+        DEBUG_MSGF("Data end (%" PRIu32 ") past data section (%" PRIu32 ")",
                    offset + size,
                    mmdb->data_section_size);
         return MMDB_INVALID_DATA_ERROR;
@@ -1523,35 +1523,35 @@ static int decode_one(const MMDB_s *const mmdb,
 
     if (type == MMDB_DATA_TYPE_UINT16) {
         if (size > 2) {
-            DEBUG_MSGF("uint16 of size %d", size);
+            DEBUG_MSGF("uint16 of size %" PRIu32, size);
             return MMDB_INVALID_DATA_ERROR;
         }
         entry_data->uint16 = (uint16_t)get_uintX(&mem[offset], (int)size);
         DEBUG_MSGF("uint16 value: %u", entry_data->uint16);
     } else if (type == MMDB_DATA_TYPE_UINT32) {
         if (size > 4) {
-            DEBUG_MSGF("uint32 of size %d", size);
+            DEBUG_MSGF("uint32 of size %" PRIu32, size);
             return MMDB_INVALID_DATA_ERROR;
         }
         entry_data->uint32 = (uint32_t)get_uintX(&mem[offset], (int)size);
         DEBUG_MSGF("uint32 value: %u", entry_data->uint32);
     } else if (type == MMDB_DATA_TYPE_INT32) {
         if (size > 4) {
-            DEBUG_MSGF("int32 of size %d", size);
+            DEBUG_MSGF("int32 of size %" PRIu32, size);
             return MMDB_INVALID_DATA_ERROR;
         }
         entry_data->int32 = get_sintX(&mem[offset], (int)size);
         DEBUG_MSGF("int32 value: %i", entry_data->int32);
     } else if (type == MMDB_DATA_TYPE_UINT64) {
         if (size > 8) {
-            DEBUG_MSGF("uint64 of size %d", size);
+            DEBUG_MSGF("uint64 of size %" PRIu32, size);
             return MMDB_INVALID_DATA_ERROR;
         }
         entry_data->uint64 = get_uintX(&mem[offset], (int)size);
         DEBUG_MSGF("uint64 value: %" PRIu64, entry_data->uint64);
     } else if (type == MMDB_DATA_TYPE_UINT128) {
         if (size > 16) {
-            DEBUG_MSGF("uint128 of size %d", size);
+            DEBUG_MSGF("uint128 of size %" PRIu32, size);
             return MMDB_INVALID_DATA_ERROR;
         }
 #if MMDB_UINT128_IS_BYTE_ARRAY
@@ -1564,7 +1564,7 @@ static int decode_one(const MMDB_s *const mmdb,
 #endif
     } else if (type == MMDB_DATA_TYPE_FLOAT) {
         if (size != 4) {
-            DEBUG_MSGF("float of size %d", size);
+            DEBUG_MSGF("float of size %" PRIu32, size);
             return MMDB_INVALID_DATA_ERROR;
         }
         size = 4;
@@ -1572,7 +1572,7 @@ static int decode_one(const MMDB_s *const mmdb,
         DEBUG_MSGF("float value: %f", entry_data->float_value);
     } else if (type == MMDB_DATA_TYPE_DOUBLE) {
         if (size != 8) {
-            DEBUG_MSGF("double of size %d", size);
+            DEBUG_MSGF("double of size %" PRIu32, size);
             return MMDB_INVALID_DATA_ERROR;
         }
         size = 8;
