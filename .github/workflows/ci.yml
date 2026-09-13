@@ -1,0 +1,44 @@
+name: CI / Tests
+
+on:
+  push:
+    branches:
+      - main
+      - feat-0.1.0
+  pull_request:
+    branches:
+      - main
+      - feat-0.1.0
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  swift-package-gate:
+    name: macOS Swift package gate
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Select Xcode 16.4
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90
+        with:
+          xcode-version: "16.4"
+
+      - name: Build, test, and enforce coverage
+        run: ./Scripts/ci.sh
+
+      - name: Publish production coverage summary
+        if: always()
+        run: |
+          summary="ForgeRuleCore/.build/coverage/production-summary.md"
+          if [[ -f "${summary}" ]]; then
+            cat "${summary}" >> "${GITHUB_STEP_SUMMARY}"
+          fi

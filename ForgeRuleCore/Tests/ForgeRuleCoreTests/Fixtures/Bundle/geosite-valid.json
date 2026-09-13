@@ -1,0 +1,21 @@
+{
+  "geosites": [
+    {
+      "country_code": "category-test",
+      "domains": [
+        {
+          "type": "full",
+          "value": "exact.example.test"
+        },
+        {
+          "type": "domain",
+          "value": "example.test"
+        },
+        {
+          "type": "plain",
+          "value": "keyword-token"
+        }
+      ]
+    }
+  ]
+}
