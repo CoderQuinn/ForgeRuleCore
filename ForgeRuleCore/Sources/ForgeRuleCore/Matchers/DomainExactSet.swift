@@ -24,6 +24,12 @@ public struct DomainExactSet: Sendable {
 
     @inline(__always)
     public func contains(_ domain: String) -> Bool {
+        containsNormalized(normalizeDomain(domain))
+    }
+
+    /// Internal fast path for a domain already passed through normalizeDomain.
+    @inline(__always)
+    func containsNormalized(_ domain: String) -> Bool {
         set.contains(domain)
     }
 }

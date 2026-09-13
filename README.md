@@ -37,6 +37,16 @@ Swift package: shared **rule kernel** for routing and DNS (`RuleCore`, `GeoSiteD
 
 ## Test locally
 
+Tests require a Swift 6 toolchain with the bundled `Testing` module; CI uses
+Xcode 16.4. The Swift 5.9 manifest version is not a promise of test-suite support
+on Swift 5.9. No additional `swift-testing` package is needed on the supported
+test toolchain.
+
+Public domain matcher and GeoSite query APIs normalize case, surrounding dots,
+and whitespace just like their stored values. Internal evaluation reuses its
+normalized domain to avoid repeating that work for each GeoSite index. Supported
+field-rule prefixes are case-insensitive; unsupported `regexp:` remains rejected.
+
 ```bash
 ./Scripts/ci.sh
 ./Scripts/check-test-governance.sh

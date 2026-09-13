@@ -214,7 +214,7 @@ public enum FieldRoutingRuleFactory {
     private static func domainEntryCondition(
         _ raw: String
     ) -> Result<RuleCondition, FieldRoutingDiagnosticReason> {
-        let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let s = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !s.isEmpty else { return .failure(.invalidDomainEntry) }
         if s.hasPrefix("geosite:") {
             let name = String(s.dropFirst("geosite:".count))
@@ -246,7 +246,7 @@ public enum FieldRoutingRuleFactory {
     private static func ipEntryCondition(
         _ raw: String
     ) -> Result<RuleCondition, FieldRoutingDiagnosticReason> {
-        let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let s = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !s.isEmpty else { return .failure(.invalidIPEntry) }
         if s.hasPrefix("geoip:") {
             let k = String(s.dropFirst("geoip:".count))

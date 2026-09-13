@@ -58,7 +58,7 @@ public final class RuleEngine: Sendable {
 
         case let .geosite(name):
             guard let d else { return false }
-            return geosite.contains(site: name, domain: d)
+            return geosite.contains(site: name, normalizedDomain: d)
 
         case let .geoip(key):
             return geoip.match(key: key, ip: input.resolvedIP)

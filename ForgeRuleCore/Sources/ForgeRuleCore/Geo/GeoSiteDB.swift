@@ -66,13 +66,18 @@ public final class GeoSiteDB: Sendable {
     }
 
     public func contains(site: String, domain: String) -> Bool {
+        contains(site: site, normalizedDomain: normalizeDomain(domain))
+    }
+
+    /// Reuse the caller's normalized domain across all three indices.
+    func contains(site: String, normalizedDomain domain: String) -> Bool {
         let siteKey = normalizeDomain(site)
         guard let idx = sites[siteKey] else { return false }
 
         // full → suffix → keyword
-        if idx.full.contains(domain) { return true }
-        if idx.suffix.containsSuffix(of: domain) { return true }
-        if idx.keyword.containsKeyword(in: domain) { return true }
+        if idx.full.containsNormalized(domain) { return true }
+        if idx.suffix.containsNormalizedSuffix(of: domain) { return true }
+        if idx.keyword.containsNormalizedKeyword(in: domain) { return true }
 
         return false
     }

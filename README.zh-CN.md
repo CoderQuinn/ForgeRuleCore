@@ -37,6 +37,14 @@ ForgeRuleCore 是供路由与 DNS 共用的 Swift 规则内核，包含 `RuleCor
 
 ## 本地验证
 
+测试要求自带 `Testing` 模块的 Swift 6 工具链；CI 使用 Xcode 16.4。
+manifest 的 Swift 5.9 版本不代表测试套件支持 Swift 5.9；受支持的测试工具链
+无需另加 `swift-testing` 包依赖。
+
+公开域名 matcher 与 GeoSite 查询入口会像建索引时一样统一大小写、首尾点及空白；
+内部评估复用已规范化的域名，避免每个 GeoSite 索引重复处理。
+受支持的 field 规则前缀不区分大小写，尚不支持的 `regexp:` 仍明确拒绝。
+
 ```bash
 ./Scripts/ci.sh
 ./Scripts/check-test-governance.sh

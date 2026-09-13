@@ -3,7 +3,7 @@ import ForgeBase
 import Foundation
 import Testing
 
-// Contract IDs: C-MMDB-BYTE-ORDER C-MMDB-OWNERSHIP C-MMDB-TEARDOWN
+// Contract IDs: C-MMDB-BYTE-ORDER C-MMDB-OWNERSHIP C-MMDB-TEARDOWN C-MMDB-CONCURRENT-OPEN
 
 private enum MMDBFixtureError: Error {
     case missing(String)
@@ -53,4 +53,23 @@ private let fixtureUSIPv4 = FBIPv4(a: 214, b: 78, c: 120, d: 1)
     #expect(firstReader?.countryCode(of: fixtureUSIPv4) == .us)
     firstReader = nil
     #expect(secondReader.countryCode(of: fixtureUSIPv4) == .us)
+}
+
+@Test func mmdb_concurrent_opens_do_not_publish_partial_or_shared_state() async throws {
+    let countryURL = try mmdbFixtureURL("GeoIP2-Country-Test")
+    let stringURL = try mmdbFixtureURL("MaxMind-DB-string-value-entries")
+    let missingURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ForgeRuleCore-missing-\(UUID().uuidString).mmdb")
+    try await withThrowingTaskGroup(of: Void.self) { group in
+        for _ in 0..<32 {
+            group.addTask {
+                let country = try MMDBReader(url: countryURL)
+                let string = try MMDBReader(url: stringURL)
+                #expect(throws: MMDBOpenError.self) { try MMDBReader(url: missingURL) }
+                #expect(country.countryCode(of: fixtureUSIPv4) == .us)
+                #expect(string.countryCode(of: fixtureUSIPv4) == nil)
+            }
+        }
+        try await group.waitForAll()
+    }
 }

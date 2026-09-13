@@ -26,6 +26,8 @@
 | C-ANY-ORDER | §4.2 #5 | FINAL 放置错误导致默认动作不对 |
 | C-DEFAULT-DIRECT | §4.2 #6 | 空规则集行为变化 |
 | C-EVAL-NORMALIZE | §4.2 #2 | 依赖调用方先 normalize |
+| C-QUERY-NORMALIZE | §4.3 | 公开 matcher / GeoSite 查询与建索引规范化不一致 |
+| C-PREFIX-CASE | §4.5 | 大写前缀被当成普通后缀，或绕过不支持表达式的拒绝 |
 | C-PORT-PROTO-IGNORED | §4.1 reserved | 误以为已支持端口/协议分流 |
 | C-COMPILER-DIAGNOSTICS | §4.5 | 拒绝原因或源 row 下标丢失，部分规则被误报为成功 |
 | C-FIELD-UNKNOWN | §4.5 | 未知限制键被解码/重编码丢弃导致放宽规则 |
@@ -36,6 +38,7 @@
 | C-FIRST-WINS | §4.2 #4 | 多规则命中顺序错误 |
 | C-MMDB-BYTE-ORDER | §5.1 | `FBIPv4.beValue` 在 C ABI 边界反序，真实 lookup 恒 miss |
 | C-MMDB-OWNERSHIP | §5.1 | 不同 reader 静默共用全局数据库或互相污染 |
+| C-MMDB-CONCURRENT-OPEN | §5.1 | 并发打开成功/失败路径暴露半初始化或共用状态 |
 | C-MMDB-TEARDOWN | §5.1 | 一个 reader 析构使另一个 reader 失效或泄漏全局句柄 |
 | C-BUNDLE-ASSEMBLY | §8 | App Group 路径未真实装配 GeoSite 与 GeoIP |
 | C-BUNDLE-LAYOUT | §8 | 固定资源名或容器解析契约漂移 |

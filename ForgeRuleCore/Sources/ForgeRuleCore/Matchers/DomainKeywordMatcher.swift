@@ -18,6 +18,12 @@ public struct DomainKeywordMatcher: Sendable {
 
     @inline(__always)
     public func containsKeyword(in domain: String) -> Bool {
+        containsNormalizedKeyword(in: normalizeDomain(domain))
+    }
+
+    /// Internal fast path for a domain already passed through normalizeDomain.
+    @inline(__always)
+    func containsNormalizedKeyword(in domain: String) -> Bool {
         for key in keywords {
             if domain.contains(key) {
                 return true

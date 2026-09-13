@@ -150,6 +150,8 @@ public final class RuleEngine: Sendable {
 3. `plain` / keyword（`DomainKeywordMatcher` 线性扫描）
 
 - 站点名与域名均经 `normalizeDomain`。
+- 公开 exact/suffix/keyword 查询入口也自行规范化；GeoSite 与 RuleEngine 内部使用
+  已规范化查询路径，在一次评估中不为三个索引重复转换域名。
 - 数据里的 `regex` 类型：**忽略**（DEBUG 下可能打印）。
 - `attributes`：解码但不参与匹配。
 
@@ -186,6 +188,8 @@ Preheat：`preheatKeys` 只缓存去掉 `!` 后的正国家码解析结果。
 
 - 每个 `type: field` row 最多产出 **一条** primitive `Rule`。
 - 接受：单个 domain entry **或** 单个 `geoip:` entry。
+- 受支持的 `geosite:` / `full:` / `domain:` / `keyword:` / `geoip:` 前缀不区分
+  大小写；`REGEXP:` 与 `regexp:` 一样拒绝，空 payload 不得降级为普通后缀。
 - `compile(fields:)` 返回保序的 accepted `rules` 与每个 rejected row 的 `fieldIndex` + 稳定 `reason`；只要存在 rejected row，`isSuccessful == false`。
 - `compileValidated(fields:)` 为新增的全有或全无入口：成功返回全部规则，失败抛出仅含完整 diagnostics 的 `FieldRoutingValidationError`，不返回可误激活的部分规则。
 - `FieldRuleJSON` 解码保留未知键名至只读 `unsupportedKeys`（不保存未知值）；未知字段即使值为 null 也拒绝，不能悄悄扩大条件。带未知字段的 DTO 重新编码会抛错，防止重编码后丢失限制。

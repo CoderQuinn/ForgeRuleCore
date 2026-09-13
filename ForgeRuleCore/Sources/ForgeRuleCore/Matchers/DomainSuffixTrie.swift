@@ -17,11 +17,11 @@ public struct DomainSuffixTrie: Sendable {
     private var nodes: [Node] = [Node()]
 
     public init(_ suffixes: [String]) {
-        var tire = DomainSuffixTrie()
+        var trie = DomainSuffixTrie()
         for s in suffixes {
-            tire.insertSuffix(s)
+            trie.insertSuffix(s)
         }
-        self = tire
+        self = trie
     }
 
     private init() {}
@@ -54,6 +54,12 @@ public struct DomainSuffixTrie: Sendable {
 
     @inline(__always)
     public func containsSuffix(of domain: String) -> Bool {
+        containsNormalizedSuffix(of: normalizeDomain(domain))
+    }
+
+    /// Internal fast path for a domain already passed through normalizeDomain.
+    @inline(__always)
+    func containsNormalizedSuffix(of domain: String) -> Bool {
         let labels = domain.split(separator: ".", omittingEmptySubsequences: true)
         guard !labels.isEmpty else { return false }
 
